@@ -16,6 +16,7 @@ from dask.diagnostics import ProgressBar
 sys.path.append("../")
 
 from readers.radar import read_radar_multiple
+from readers.lcl import read_lcl
 
 ProgressBar().register()
 
@@ -41,7 +42,7 @@ def main():
     ds_ct.to_netcdf(
         os.path.join(
             "/data/obs/campaigns/eurec4a/msm/",
-            "cloud_lcl_classification_v2.nc",
+            "cloud_lcl_classification_v3.nc",
         )
     )
 
@@ -85,7 +86,7 @@ def prepare_data():
     """
 
     # lifting condensation level
-    ds_lcl = xr.open_dataset("/data/obs/campaigns/eurec4a/msm/LCL_dataset.nc")
+    ds_lcl = read_lcl()
 
     # radar reflectivity
     ds_ze = read_radar_multiple()
@@ -127,8 +128,18 @@ def cloud_typing(da_cm, da_lcl):
     """
     Typing of clouds based on cloud mask and lifting condensation level
 
-    Procedure:
-    - check if any hydrometeor is above/below lcl
+    Precipitation definitions:
+    - no cloud observed
+    - non-precipitating: no pixel below lcl, but above lcl
+    - precipitating: pixels occur below and above lcl
+    - other (only below lcl)
+
+    Height definitions:
+    - shallow cloud = cloud top between LCL and LCL + 600 m
+    - congestus cloud = cloud top between LCL + 600 m and 4 km height
+    - cloud only below LCL
+    - cloud only above 4 km height
+    - cloud above and below 4 km height
 
     Parameters
     ----------
@@ -138,87 +149,99 @@ def cloud_typing(da_cm, da_lcl):
         Lifting condensation level.
     """
 
-    # 1. check if cloud is precipitating
-    # get index of range gates above LCL and below or equal to LCL
-    ix_above_lcl = da_cm.height > da_lcl
-    ix_below_lcl = da_cm.height <= da_lcl
-    cloud_above_lcl = da_cm.where(ix_above_lcl).sum("height").values > 0
-    cloud_below_lcl = da_cm.where(ix_below_lcl).sum("height").values > 0
-
-    # 2. check cloud height with respect to LCL
-    # check if cloud is within 600 m above of lcl or above
-    ix_within_lcl_600 = (da_cm.height > da_lcl) & (
-        da_cm.height <= da_lcl + 600
-    )
-    ix_above_lcl_600 = (da_cm.height > da_lcl + 600) & (da_cm.height <= da_lcl)
-    ix_above_4000 = da_cm.height > 4000
-    cloud_within_lcl_600 = (
-        da_cm.where(ix_within_lcl_600).sum("height").values > 0
-    )
-    cloud_above_lcl_600 = da_cm.where(ix_above_lcl_600).sum("height").values > 0
-    cloud_above_4000 = (
-        da_cm.isel({"height": ix_above_4000}).sum("height").values > 0
-    )
-    cloud_somewhere = da_cm.sum("height").values > 0
+    # check inputs
+    assert np.sum(np.isnan(da_lcl)) == 0
 
     # array to save time-dependend classes
-    p_arr = np.full(shape=len(da_cm.time), fill_value=-3, dtype="int8")
-    q_arr = np.full(shape=len(da_cm.time), fill_value=-3, dtype="int8")
+    p_arr = np.full(shape=len(da_cm.time), fill_value=-2, dtype="int8")
+    q_arr = np.full(shape=len(da_cm.time), fill_value=-2, dtype="int8")
+
+    # to select only height bins above lcl
+    ix_above_lcl = da_cm.height > da_lcl
+    ix_below_lcl = da_cm.height <= da_lcl
+    ix_below_lclplus600 = da_cm.height <= (da_lcl + 600)
+    ix_above_lclplus600 = da_cm.height > (da_lcl + 600)
+    ix_within_lcl_lclplus600 = ix_below_lclplus600 & ix_above_lcl
+    ix_above_4000 = da_cm.height > 4000
+
+    # non-height dependent binary flags
+    # specific height range
+    is_not_any = da_cm.sum("height").values == 0
+
+    # hydrometeor presence
+    is_any_above_lcl = da_cm.where(ix_above_lcl).sum("height").values > 0
+    is_any_below_lcl = da_cm.where(ix_below_lcl).sum("height").values > 0
+    is_any_within_lcl_lclplus600 = (
+        da_cm.where(ix_within_lcl_lclplus600).sum("height").values > 0
+    )
+    is_any_above_lcl_600 = (
+        da_cm.where(ix_above_lclplus600).sum("height").values > 0
+    )
+    is_any_above_4000 = da_cm.where(ix_above_4000).sum("height").values > 0
+
+    # general definitions
+    is_clear = is_not_any
+
+    # precipitation definitions
+    is_precipitating = is_any_below_lcl & is_any_above_lcl
+    is_not_precipitating = ~is_any_below_lcl & is_any_above_lcl
+    is_below_lcl_and_not_above_lcl = is_any_below_lcl & ~is_any_above_lcl
+
+    assert len(is_clear) == (
+        is_clear.sum()
+        + is_precipitating.sum()
+        + is_not_precipitating.sum()
+        + is_below_lcl_and_not_above_lcl.sum()
+    )
+
+    # type definitions
+    is_shallow = is_any_within_lcl_lclplus600 & ~is_any_above_lcl_600
+    is_congestus = is_any_above_lcl_600 & ~is_any_above_4000
+
+    assert is_shallow.sum() > 0
+    assert is_congestus.sum() > 0
+    assert (is_shallow & is_congestus).sum() == 0
 
     # precipitation classes
-    p_arr[np.isnan(da_lcl).values] = -2  # no lcl data available
-    p_arr[~cloud_somewhere] = -1  # no cloud observed
-    p_arr[~cloud_below_lcl & cloud_above_lcl] = 0  # non-precipitating cloud
-    p_arr[cloud_below_lcl & cloud_above_lcl] = 1  # precipitating cloud
-    p_arr[cloud_below_lcl & ~cloud_above_lcl] = 2  # only below lcl
+    p_arr[is_clear] = -1
+    p_arr[is_not_precipitating] = 0
+    p_arr[is_precipitating] = 1
+    p_arr[is_below_lcl_and_not_above_lcl] = 2
 
     # height classes
-    q_arr[np.isnan(da_lcl).values] = -2  # no LCL
-    q_arr[~cloud_somewhere] = -1  # no cloud observed
-    q_arr[
-        cloud_within_lcl_600 & ~cloud_above_lcl_600 & ~cloud_above_4000
-    ] = 0  # shallow
-    q_arr[cloud_above_lcl_600 & ~cloud_above_4000] = 1  # stratiform
-    q_arr[cloud_below_lcl & ~cloud_above_lcl] = 2  # very low cloud
-    q_arr[
-        ~cloud_below_lcl
-        & ~cloud_within_lcl_600
-        & ~cloud_above_lcl_600
-        & cloud_above_4000
-    ] = 3  # very high cloud, pixels above 4 km height
-    q_arr[
-        (cloud_below_lcl | cloud_within_lcl_600 | cloud_above_lcl_600)
-        & cloud_above_4000
-    ] = 4  # very high clouds, also somewhere else
+    q_arr[is_clear] = -1
+    q_arr[is_shallow] = 0
+    q_arr[is_congestus] = 1
 
     # write to xarray dataset
     ds_ct = xr.Dataset()
     ds_ct.coords["time"] = da_cm.time.values
-    ds_ct["precip"] = ("time", p_arr)
-    ds_ct["shape"] = ("time", q_arr)
-
-    ds_ct["precip"].attrs = dict(
-        comment=(
-            "-3: unclassified, "
-            "-2: no LCL data available, "
-            "-1: no cloud observed, "
-            "0: non-precipitating cloud (no pixels below LCL, but above LCL), "
-            "1: precipitating cloud (pixels occur below and above LCL), "
-            "2: cloud only below LCL"
-        )
+    ds_ct["precip"] = xr.DataArray(
+        data=p_arr,
+        dims=("time"),
+        coords={"time": da_cm.time.values},
+        attrs=dict(
+            comment=(
+                "-1: no hydrometeors present, "
+                "0: non-precipitating (pixels are above LCL, but not below), "
+                "1: precipitating (pixels are below and above LCL), "
+                "2: other (pixels are below LCL, but not above)"
+            )
+        ),
     )
 
-    ds_ct["shape"].attrs = dict(
-        comment=(
-            "-3: unclassified, "
-            "-2: no LCL data available, "
-            "-1: no cloud observed, "
-            "0: shallow cloud = cloud top between LCL and LCL + 600 m), "
-            "1: stratiform cloud = cloud top between LCL + 600 m and 4 km height, "
-            "2: cloud only below LCL, "
-            "3: cloud only above 4 km height, "
-            "4: cloud above and below 4 km height"
-        )
+    ds_ct["shape"] = xr.DataArray(
+        data=q_arr,
+        dims=("time"),
+        coords={"time": da_cm.time.values},
+        attrs=dict(
+            comment=(
+                "-2: unclassified (neither shallow nor congestus), "
+                "-1: no hydrometeors present, "
+                "0: shallow (cloud top between LCL and LCL + 600 m), "
+                "1: congestus (cloud top between LCL + 600 m and 4 km), "
+            )
+        ),
     )
 
     return ds_ct
