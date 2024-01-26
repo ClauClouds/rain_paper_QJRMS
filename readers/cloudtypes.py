@@ -5,7 +5,7 @@ Reader for cloud types
 import os
 
 import xarray as xr
-
+from datetime import timedelta, datetime
 
 def read_cloudtypes():
     """
