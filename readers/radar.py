@@ -165,3 +165,65 @@ def get_radar_files():
     )
 
     return files
+
+
+def read_lwp():
+    """
+    read LWP/IWV data obtained from the single channel retrieval at 89 GHz from the passive channel on the wband radar data
+    function modified to include post processing provided by Sabrina on the 29.01.2024 for flagging non valid LWP data
+    Returns
+    -----
+    xarray dataset with LWP data
+    
+    """
+    
+    LWP_IWV_data = xr.open_dataset('/data/obs/campaigns/eurec4a/mwr_dataset/version2.0.0/Level2/EUREC4A_Merian_MWR-MSMRAD_Level2_v2.0.0.nc')
+    # post process LWP data to read only data without precipitation and where obs flags from MWR are true
+    LWP_good = apply_filters(LWP_IWV_data,site='site')
+    
+    
+    return LWP_good
+
+
+
+def read_radar_single_file(yy,mm,dd):
+    """
+    Read radar data corresponding to the selected day
+
+    Returns
+    -------
+    ds: xarray dataset with radar data
+    """
+    radarFile = '/data/obs/campaigns/eurec4a/msm/wband_radar/ncdf/published_data_v2/'+yy+mm+dd+'_wband_radar_msm_eurec4a_intake.nc'
+    radarData =  xr.open_dataset(radarFile)
+    
+    return radarData
+
+
+def apply_filters(xrin,site='merian'):
+    '''
+    applies precip_mask, quality_masks to mwr xr datasets by setting nans where flags are True
+    INPUT: 
+    - xrin: xr Dataset
+    - site: string with site name ('merian' for our ship)
+    OUTPUT:
+    - xr Dataset with 'faulty'=filtered data replaced by nans
+    '''
+    data = xrin.copy()
+    
+    # now do Wband =============
+    #general wband quality
+    for k in ['iwv', 'lwp']:
+        data[k].values[data.quality_mask[:,0] == 1.] = np.nan
+        #data[k].values[data.precip_mask == 1.] = np.nan #to ensure that Clau and I are using the same precip masks(?)
+    #iwv quality:
+    data['iwv'].values[data.quality_mask[:,1] == 1.] = np.nan
+    #lwp quality:
+    data['lwp'].values[data.quality_mask[:,2] == 1.] = np.nan
+
+    if site == 'merian':
+        data['tb'].values[data.quality_mask[:,0] == 1.] = np.nan 
+        #data['tb'].values[data.precip_mask == 1.] = np.nan 
+    
+    return data
+
