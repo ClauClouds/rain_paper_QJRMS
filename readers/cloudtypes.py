@@ -8,6 +8,20 @@ import pandas as pd
 import xarray as xr
 
 
+def read_rain_flags():
+    '''
+    read rain flags and returns ds for the entire campaign
+    '''
+    ds = xr.open_dataset(
+        os.path.join(
+            "/data/obs/campaigns/eurec4a/msm/",
+            "cloud_class_prop_flags.nc",
+        )
+    )
+    
+    return ds
+
+
 def read_cloudtypes():
     """
     Read cloud types
@@ -27,33 +41,46 @@ def read_cloudtypes():
     return ds
 
 
+def read_cloud_class():
+    '''
+    read cloud classification and returns ds for the entire campaign
+    ''' 
+    ds = xr.open_dataset( 
+        os.path.join(
+            "/data/obs/campaigns/eurec4a/msm/",
+            "cloud_lcl_classification_v3.nc",
+        )
+    )
+
+    return ds
+
+
+def read_cloud_class():
+    '''
+    read cloud classification and returns ds for the entire campaign
+    ''' 
+    ds = xr.open_dataset( 
+        os.path.join(
+            "/data/obs/campaigns/eurec4a/msm/",
+            "cloud_lcl_classification_v3.nc",
+        )
+    )
+
+    return ds
+
+
 def read_merian_classification():
-    """
-    function to read merian mesoscale classification from Isabel Mc Coy
+    """_summary_
+    function to read merian mesoscale classification from Isabel 
     returns:
     ds: xarray dataset with classification data
 
     """
-
-    ds = xr.open_dataset(
-        "/data/obs/campaigns/eurec4a/msm/EUREC4A_ATOMIC_C3ONTEXTClassifications_CollocatedTo_MS-Merian_ManualInstant_IR_FreqLim_0.5.nc",
-        decode_times=False,
-    )
-
-    ds_new = preprocess_class(ds)
-
-    return ds_new
-
-
-def preprocess_class(ds):
-    """
-    preprocess time stamps converting them from fractional day of the year to datetime
-    Args:
-        ds (xarray dataset): dataset with mesoscale classification data and additional datetime coordinate
-    """
-
-    ds["datetime"] = pd.to_datetime(
-        ds.day_frac.values, unit="D", origin=pd.Timestamp("01-01-2020")
-    )
-
+    ds = xr.open_dataset('/data/obs/campaigns/eurec4a/msm/EUREC4A_ATOMIC_C3ONTEXTClassifications_CollocatedTo_MS-Merian_ManualInstant_IR_FreqLim_0.5.nc', decode_times=False)
+    ds['time'] = pd.to_datetime('2020-1-1') \
+                + pd.to_timedelta(ds.day_frac.values, unit='days') # converting time stamps from fractional time of the year to datetime
+    
+    
     return ds
+
+
