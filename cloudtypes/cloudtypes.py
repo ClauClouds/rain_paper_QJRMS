@@ -15,8 +15,9 @@ from dask.diagnostics import ProgressBar
 
 sys.path.append("../")
 
-from readers.radar import read_radar_multiple
 from readers.lcl import read_lcl
+from readers.position import read_position
+from readers.radar import read_radar_multiple
 
 ProgressBar().register()
 
@@ -122,6 +123,75 @@ def cloud_mask(ds):
     da_cm = da_cm.rename("cloud_mask")
 
     return da_cm
+
+
+def cloud_mask_lcl_grid():
+    """
+    Creates cloud mask on height grid relative to lifting condensation level.
+    """
+
+    # read radar reflectivity and lifting condensation level
+    ds_ze, ds_lcl = prepare_data()
+    da_lcl = ds_lcl.lcl
+
+    # cloud mask
+    da_cm = cloud_mask(ds_ze)
+
+    # interpolate cloud mask on regular height grid of 7.45 m that covers the
+    # height difference to the lcl
+    dz = 7.45
+    z_rel = np.arange(
+        da_cm.height.min() - da_lcl.max(),
+        da_cm.height.max() - da_lcl.min() + dz,
+        dz,
+    )
+    z_rel = z_rel - z_rel[z_rel > 0].min()  # center around zero
+    da_cm = da_cm.interp(
+        height=z_rel, method="nearest", kwargs={"fill_value": 0}
+    )
+
+    # calculate shift of all height values at each time step
+    # positive shift means each height bin is shifted downward
+    rows, columns = np.ogrid[: da_cm.shape[0], : da_cm.shape[1]]  # 2d indices
+    shift = ((da_lcl + dz / 2) // dz).values.astype("int16")
+    columns = columns + shift[:, np.newaxis]
+    columns[columns >= columns.shape[1]] = columns.shape[1] - 1  # upper bound
+    da_cm[:] = da_cm.values[rows, columns]
+
+    return da_cm
+
+
+def classify_region():
+    """
+    Classify observations by latitude
+    """
+
+    ds_pos = read_position()
+
+    # interpolate linearly along time dimension
+    ds_pos = ds_pos.interpolate_na(
+        dim="time", method="linear", fill_value="extrapolate"
+    )
+
+    da_pos_class = xr.where(np.isnan(ds_pos.lat), -1, -3)
+    da_pos_class = xr.where(ds_pos.lat < 10.5, 0, da_pos_class)
+    da_pos_class = xr.where(
+        (ds_pos.lat <= 12.5) & (ds_pos.lat >= 10.5), 1, da_pos_class
+    )
+    da_pos_class = xr.where(ds_pos.lat > 12.5, 2, da_pos_class)
+    da_pos_class.attrs = {
+        "comment": (
+            "0: oceanic eddies region (msm < 10.5degN), "
+            "1: transition region (12.5degN >= msm >= 10.5degN), "
+            "2: trade wind climatological region (msm > 12.5degN), "
+            "-1: unknown (no latitude available)"
+        )
+    }
+
+    # rename to region
+    da_pos_class = da_pos_class.rename("region")
+
+    return da_pos_class
 
 
 def cloud_typing(da_cm, da_lcl):

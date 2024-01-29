@@ -3,7 +3,13 @@ CFADs for different LWP levels.
 """
 
 import os
-from string import ascii_lowercase as abc
+import sys
+from string import ascii_lowercase
+
+# add parent directory to path
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+)
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -11,6 +17,7 @@ import numpy as np
 import xarray as xr
 from dask.diagnostics import ProgressBar
 from dotenv import load_dotenv
+from mpl_style import CMAP
 from xhistogram.xarray import histogram
 
 from readers.cloudtypes import read_cloudtypes
@@ -142,35 +149,29 @@ def visualize(da_cfad, da_cfad_norm):
 
     # liquid water path upper boundary
     headers = [
-        "< 10 g m$^{-2}$",
-        "< 50 g m$^{-2}$",
-        "< 100 g m$^{-2}$",
-        "< 300 g m$^{-2}$",
-        "< 1000 g m$^{-2}$",
-        "all",
+        "0$-$10 g m$^{-2}$",
+        "10$-$50 g m$^{-2}$",
+        "50$-$100 g m$^{-2}$",
+        "100$-$300 g m$^{-2}$",
+        "300$-$1000 g m$^{-2}$",
+        "All observations",
     ]
 
     # colormap
-    cmap = plt.cm.get_cmap("jet")
     bounds = np.arange(0, 1.1, 0.1)
-    norm = mcolors.BoundaryNorm(bounds, cmap.N)
+    norm = mcolors.BoundaryNorm(bounds, CMAP.N)
 
     fig, axes = plt.subplots(
-        3,
         2,
-        figsize=(5, 5),
+        3,
+        figsize=(7, 4),
         constrained_layout=True,
         sharex="all",
         sharey="all",
     )
 
     for ax in axes.flatten():
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.spines["bottom"].set_linewidth(3)
-        ax.spines["left"].set_linewidth(3)
-        ax.get_xaxis().tick_bottom()
-        ax.get_yaxis().tick_left()
+        ax.grid(False)
 
     for i, ax in enumerate(axes.flatten()[:-1]):
         ax.pcolormesh(
@@ -178,7 +179,7 @@ def visualize(da_cfad, da_cfad_norm):
             da_cfad_norm.height * 1e-3,
             da_cfad_norm.isel(wlwp_bin=i),
             norm=norm,
-            cmap=cmap,
+            cmap=CMAP,
             shading="nearest",
         )
 
@@ -193,15 +194,19 @@ def visualize(da_cfad, da_cfad_norm):
         da_cfad_all_norm.height * 1e-3,
         da_cfad_all_norm,
         norm=norm,
-        cmap=cmap,
+        cmap=CMAP,
         shading="nearest",
     )
 
-    fig.colorbar(im, ax=axes, label="Density", shrink=0.5, ticks=bounds)
+    fig.colorbar(
+        im, ax=axes, label="Relative density", ticks=np.arange(0, 1.1, 0.2)
+    )
 
     for ax in axes.flatten():
         ax.set_xticks(np.arange(-60, 50, 5), minor=True)
-        ax.set_xticks(np.arange(-60, 50, 20), minor=False)
+        ax.set_xticks(np.arange(-60, 50, 20))
+        ax.set_yticks(np.arange(0, 4.01, 0.25), minor=True)
+        ax.set_yticks(np.arange(0, 5, 1))
 
     axes[0, 0].set_xlim([-60, 30])
     axes[0, 0].set_ylim([0, 4])
@@ -213,7 +218,7 @@ def visualize(da_cfad, da_cfad_norm):
     # annotate letter labels
     for i, ax in enumerate(axes.flatten()):
         ax.annotate(
-            f"{abc[i]})   {headers[i]}",
+            f"{ascii_lowercase[i]}) {headers[i]}",
             xy=(0, 1),
             xycoords="axes fraction",
             ha="left",
@@ -221,10 +226,7 @@ def visualize(da_cfad, da_cfad_norm):
         )
 
     plt.savefig(
-        os.path.join(os.environ["PATH_PLOT"], "cfad_lwp.png"),
-        dpi=300,
-        bbox_inches="tight",
-        transparent=True,
+        os.path.join(os.environ["PATH_PLOT"], "cfad.png"),
     )
     plt.close()
 

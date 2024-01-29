@@ -39,6 +39,8 @@ def read_radar_multiple():
 
     ds = xr.open_mfdataset(files, preprocess=preprocess)
 
+    ds = ds.reset_coords(drop=True)
+
     return ds
 
 
