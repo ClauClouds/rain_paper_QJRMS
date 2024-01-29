@@ -18,7 +18,7 @@ sys.path.insert(
 )
 
 from cloudtypes.cloudtypes import classify_region, cloud_mask_lcl_grid
-from readers.cloudtypes import read_cloudtypes
+from readers.cloudtypes import read_cloud_class
 
 load_dotenv()
 
@@ -54,7 +54,7 @@ def prepare_data():
     da_cm_lcl = cloud_mask_lcl_grid()
 
     # read cloud types
-    ds_ct = read_cloudtypes()
+    ds_ct = read_cloud_class()
 
     # classify by region
     da_pos_class = classify_region()

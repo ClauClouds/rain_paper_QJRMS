@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 from mpl_style import CMAP
 from xhistogram.xarray import histogram
 
-from readers.cloudtypes import read_cloudtypes
+from readers.cloudtypes import read_cloud_class
 from readers.lwp import read_lwp
 from readers.radar import read_radar_multiple
 
@@ -77,7 +77,7 @@ def prepare_data():
     """
 
     ds_lwp = read_lwp()
-    ds_ct = read_cloudtypes()
+    ds_ct = read_cloud_class()
     ds_ze = read_radar_multiple()
 
     # on common timestamp
