@@ -54,3 +54,16 @@ def read_merian_classification():
     )  # converting time stamps from fractional time of the year to datetime
 
     return ds
+
+
+
+def read_in_clouds_radar_moments():
+    '''
+    read file containing radar moments selected above cloud base
+    
+    '''
+    
+    path_in = '/work/plots_rain_paper/'
+    data = xr.open_dataset(path_in+'ze_sk_vd_above_cloud_base.nc')
+    
+    return data
