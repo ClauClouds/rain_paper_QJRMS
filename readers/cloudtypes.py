@@ -67,3 +67,21 @@ def read_in_clouds_radar_moments():
     data = xr.open_dataset(path_in+'ze_sk_vd_above_cloud_base.nc')
     
     return data
+
+
+
+
+def read_diurnal_cycle(var_string):
+    """
+    function to read the diurnal cycle from the ncdf file where it is stored
+    arguments:
+        var_string: string indicating the variable name to be read
+     
+    output:
+        diurnalcycle dataset (xarray dataset)
+    """
+    diurnal_cycle = xr.open_dataset('/work/plots_rain_paper/diurnal_cycle_arthus/5_mins/'+var_string+'_diurnal_cycle.nc')
+
+    return diurnal_cycle
+
+
