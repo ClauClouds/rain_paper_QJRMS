@@ -11,6 +11,9 @@ COLOR_N = cmc.grayC(0.75)
 COLOR_T = cmc.grayC(0.5)
 COLOR_S = cmc.grayC(0.25)
 CMAP = cmc.batlow
+CMAP_an = cmc.vik
+CMAP_discr = cmc.batlowW
+
 
 mpl.rcParams["legend.frameon"] = False
 
