@@ -304,7 +304,7 @@ def visualize_figure_rain(mrr_shallow, mrr_congestus, surf_shallow, surf_congest
     fig.tight_layout()
 
     plt.savefig(
-        os.path.join('/work/plots_rain_paper/', "figure09.png"),
+        os.path.join('/work/plots_rain_paper/', "figure08.png"),
         dpi=300,
         bbox_inches="tight",
         transparent=True,
