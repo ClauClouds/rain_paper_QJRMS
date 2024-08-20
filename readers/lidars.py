@@ -25,6 +25,14 @@ import itertools
 import os.path
 
 
+def read_h_wind():
+    """
+    function to read horizontal wind speed 
+    
+    """
+    data = xr.open_dataset('/data/obs/campaigns/eurec4a/msm/h_wind_speed/horizontal_wind_direction_msm_eurec4a_campaign.nc')
+    return(data)
+
 
 def read_diurnal_cycle(var_string):
     """function to read diurnal cycle of the given input var
