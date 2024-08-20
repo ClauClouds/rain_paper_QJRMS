@@ -22,7 +22,7 @@ def main():
 
     
     # string names of the variable to process for calculation of diurnal cycle
-    var_string_arr = ['T', 'MR', 'VW']
+    var_string_arr = ['SHF', 'LHF']
     
     # loop on variables 
     for ind, var_string in enumerate(var_string_arr):
@@ -185,7 +185,16 @@ def calculate_anomaly(diurnal_cycle, data, var_name, path_out):
                    encoding={'Product':{"zlib":True, "complevel":9},\
                     "anomaly": {"dtype": "f4", "zlib": True, "complevel":9}, \
                     "Time": {"units": "seconds since 2020-01-01", "dtype": "i4"}})
- 
+    elif var_name == 'LHF':
+        data.to_netcdf(path_out+var_name+'_arthus_anomaly.nc',
+                   encoding={'Product':{"zlib":True, "complevel":9},\
+                    "anomaly": {"dtype": "f4", "zlib": True, "complevel":9}, \
+                    "Time": {"units": "seconds since 2020-01-01", "dtype": "i4"}})
+    elif var_name == 'SHF':
+        data.to_netcdf(path_out+var_name+'_arthus_anomaly.nc',
+                   encoding={'Product':{"zlib":True, "complevel":9},\
+                    "anomaly": {"dtype": "f4", "zlib": True, "complevel":9}, \
+                    "Time": {"units": "seconds since 2020-01-01", "dtype": "i4"}})
     return data
     
  

@@ -25,6 +25,20 @@ import itertools
 import os.path
 
 
+
+def read_diurnal_cycle(var_string):
+    """function to read diurnal cycle of the given input var
+
+    Args:
+        var_string (string): input var
+    """
+    from cloudtypes.path_folders import path_diurnal_cycle_arthus
+    data = xr.open_dataset(path_diurnal_cycle_arthus+var_string+'_diurnal_cycle.ncdf')
+    return(data)
+
+    
+
+
 def extract_halo_cell_profiles(file_string, time_start, time_end, var_string, var_unit):
     '''function to read Arthus and doppler lidar data and extract the mean profiles over time on each of the rain cells 
     input: file_string: string containing file name list 
@@ -347,6 +361,8 @@ def f_clean_lidar_signal_from_noise_v1(data_path, dict_var, noise_mask_file='/ne
     '''
         
     global arthus_files
+    if (dict_var['var_name'] == 'SHF'):
+        arthus_files = np.sort(glob.glob(data_path+'*.cdf'))
     if (dict_var['var_name'] == 'LHF'):
         arthus_files = np.sort(glob.glob(data_path+'*.cdf'))
     if (dict_var['var_name'] == 'VW'):
