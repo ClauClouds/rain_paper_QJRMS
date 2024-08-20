@@ -1,5 +1,5 @@
 
-from readers.wband import read_radar_multiple, read_weather_data
+from readers.radar import read_radar_multiple, read_weather_data
 from readers.cloudtypes import read_rain_flags, read_cloud_class
 import numpy as np
 import xarray as xr
@@ -19,6 +19,7 @@ def main():
     # setting output path
     path_out = '/work/4sibylle/surface_diurnal_cycles/'
     filename= path_out+'_surface_diurnal_cycle.nc'
+    
     # reading weather station on the radar
     surface_station_data = read_weather_data()    
     
