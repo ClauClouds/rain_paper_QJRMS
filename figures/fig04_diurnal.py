@@ -9,7 +9,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 from mpl_style import CMAP, COLOR_CONGESTUS, COLOR_SHALLOW
 
 # add parent directory to path
@@ -20,7 +20,7 @@ sys.path.insert(
 from cloudtypes.cloudtypes import classify_region, cloud_mask_lcl_grid
 from readers.cloudtypes import read_cloud_class
 
-load_dotenv()
+#load_dotenv()
 
 
 def main():
@@ -52,7 +52,7 @@ def prepare_data():
 
     # calculate cloud mask with respect to lcl
     da_cm_lcl = cloud_mask_lcl_grid()
-
+    
     # read cloud types
     ds_ct = read_cloud_class()
 
