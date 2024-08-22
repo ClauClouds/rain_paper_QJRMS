@@ -11,7 +11,7 @@ from figures.mpl_style import CMAP
 import os
 
 from readers.cloudtypes import read_in_clouds_radar_moments, read_cloud_class, read_rain_flags
-from readers.wband import read_lwp
+from readers.radar import read_lwp
 
 
 
