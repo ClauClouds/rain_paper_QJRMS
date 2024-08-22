@@ -85,3 +85,9 @@ def read_diurnal_cycle(var_string):
     return diurnal_cycle
 
 
+def read_rain_ground():
+    """
+    read file with flag for rain at the ground
+    """
+    ds_r = xr.open_dataset('/data/obs/campaigns/eurec4a/msm/rain_ground_classification_v3.nc')
+    return(ds_r)

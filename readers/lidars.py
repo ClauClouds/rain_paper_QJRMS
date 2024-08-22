@@ -501,3 +501,117 @@ def read_anomalies(measurement):
     
     return data
     
+
+def convert_local_time_and_reorder_for_time_hh_mm(data):
+    """
+    function to convert time array of diurnal cycle data from UTC to local time and reorder 
+    data with respect to hh:mm, displaying diurnal cycle correctly.
+    
+
+    Args:
+        data (xarray dataset): data to reorder
+    Returns:
+        data_sorted
+    """
+    data['Time'] = pd.to_datetime(data.Time.values) - timedelta(hours=4)
+    times = pd.to_datetime(data.Time.values)
+    times_hh = times.hour
+    times_mm = times.minute
+    num_times= np.arange(0,len(times_mm))
+    times_new = ([datetime(2000,1,1,times_hh[i], times_mm[i]) for i in num_times])
+    data['Time'] = times_new
+    data_sorted = data.sortby('Time')
+    
+    return(data_sorted)
+
+def read_all_lidar_diurnal_cycle_files(path_to_file):
+    """function to read all lidar diurnal cycle files and 
+    convert them to local time 
+    
+    arguments:
+    path_to_file: string, path to the file directory
+    dependencies:
+    
+    convert_local_time_and_reorder_for_time_hh_mm
+    
+    returns (list of xarray dataset)
+    """
+    T_data = xr.open_dataset(path_to_file+'T_diurnal_cycle.nc')
+    MR_data = xr.open_dataset(path_to_file+'MR_diurnal_cycle.nc')
+    VW_data = xr.open_dataset(path_to_file+'VW_diurnal_cycle.nc')
+
+    data_array = [T_data, MR_data, VW_data]
+    var_list = ['T','MR','VW']
+    # convert time to local time (UTC - 4)
+    data_lt = []
+    
+    for i, data in enumerate(data_array):
+        var_name = var_list[i]
+        data_new = convert_local_time_and_reorder_for_time_hh_mm(data)
+        data_new = data_new.rename({'diurnal_cycle':var_name})
+        data_lt.append(data_new)
+        
+    data_out = xr.merge(data_lt)
+    return(data_out)
+
+
+def read_h_wind(path_to_file):
+    """function to read all lidar diurnal cycle files and 
+    convert them to local time 
+    
+    arguments:
+    path_to_file: string, path to the file directory
+    dependencies:
+    
+    convert_local_time_and_reorder_for_time_hh_mm
+    
+    returns (list of xarray dataset)
+    """
+    H_wind_data = xr.open_dataset(path_to_file+'H_wind_speed_diurnal_cycle.nc')
+
+
+    data_array = [ H_wind_data]
+    var_list = [ 'HW']
+    # convert time to local time (UTC - 4)
+    data_lt = []
+    
+    for i, data in enumerate(data_array):
+        var_name = var_list[i]
+        data_new = convert_local_time_and_reorder_for_time_hh_mm(data)
+        data_new = data_new.rename({'diurnal_cycle':var_name, 'Time':'time_h', 'Height':'height_h'})
+        
+        data_lt.append(data_new)
+
+    data_out = xr.merge(data_lt, join='inner' )
+    return(data_out)
+
+
+def read_fluxes(path_to_file):
+    """function to read all lidar diurnal cycle files and 
+    convert them to local time 
+    
+    arguments:
+    path_to_file: string, path to the file directory
+    dependencies:
+    
+    convert_local_time_and_reorder_for_time_hh_mm
+    
+    returns (list of xarray dataset)
+    """
+    LHF_data = xr.open_dataset(path_to_file+'LHF_diurnal_cycle.nc')
+    SHF_data = xr.open_dataset(path_to_file+'SHF_diurnal_cycle.nc')
+
+    data_array = [ LHF_data, SHF_data]
+    var_list = [ 'LHF', 'SHF']
+    # convert time to local time (UTC - 4)
+    data_lt = []
+    
+    for i, data in enumerate(data_array):
+        var_name = var_list[i]
+        data_new = convert_local_time_and_reorder_for_time_hh_mm(data)
+        data_new = data_new.rename({'diurnal_cycle':var_name, 'Time':'time_coarse', 'Height':'height_coarse'})
+        
+        data_lt.append(data_new)
+
+    data_out = xr.merge(data_lt, join='inner', )
+    return(data_out)
