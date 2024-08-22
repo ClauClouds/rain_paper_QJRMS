@@ -39,9 +39,12 @@ def main():
     hw_ds = read_h_wind(path_diurnal_cycle_arthus)
     
     # calculate heights with respect to lcl
-     = calc_lcl_grid()
+    hw_ds = hw_ds.rename({'height_h':'height', 'time_h':'time'})
+    hw_lcl = calc_lcl_grid(hw_ds)
+    hw_lcl = hw_lcl.rename({'height':'height_h', 'time':'time_h'})
+    print(hw_lcl)
 
-    
+    strasuka
     
     plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds)
 
@@ -137,22 +140,33 @@ def calc_lcl_grid(data):
 
     # lifting condensation level
     ds_lcl = read_lcl()
+    print(ds_lcl)
+    
+    ds = data.load()
+    
+    # interp lcl data on ds time 
+    ds_lcl = ds_lcl.interp(time=ds.time)
+    plt.plot(ds_lcl.time.values, ds_lcl.lcl.values)
     
     # align both time series
     data, ds_lcl = xr.align(data, ds_lcl)
     assert len(ds_lcl.time) == len(data.time)
 
-    
+    da_lcl = ds_lcl.lcl
+    print(da_lcl)
+    print(np.nanmin(ds.height), np.nanmax(ds.heigth))
+    starsuka
     # interpolate data on regular height grid of 7.45 m that covers the
     # height difference to the lcl
     dz = 7.45
+    print(ds.height.min(), ds.height.max(), da_lcl.max(), da_lcl.min())
     z_rel = np.arange(
-        data.height.min() - data.max(),
-        data.height.max() - data.min() + dz,
+        ds.height.min() - da_lcl.max(),
+        ds.height.max() - da_lcl.min() + dz,
         dz,
     )
     z_rel = z_rel - z_rel[z_rel > 0].min()  # center around zero
-    data = data.interp(
+    ds = ds.interp(
         height=z_rel, method="nearest", kwargs={"fill_value": 0}
     )
     
@@ -163,8 +177,8 @@ def calc_lcl_grid(data):
     shift = ((ds_lcl + dz / 2) // dz).values.astype("int16")
     columns = columns + shift[:, np.newaxis]
     columns[columns >= columns.shape[1]] = columns.shape[1] - 1  # upper bound
-    data[:] = data.values[rows, columns]
-    return(data)
+    ds[:] = ds.values[rows, columns]
+    return(ds)
     
 def prepare_data():
     
