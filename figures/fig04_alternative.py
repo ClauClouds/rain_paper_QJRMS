@@ -12,10 +12,11 @@ from cloudtypes.cloudtypes import classify_region, cloud_mask_lcl_grid
 from readers.cloudtypes import read_cloud_class, read_rain_ground
 from readers.lidars import read_all_lidar_diurnal_cycle_files, read_h_wind, read_fluxes
 from cloudtypes.path_folders import path_diurnal_cycle_arthus, path_paper_plots
-
+from readers.lcl import read_lcl
+from datetime import datetime
 import os
 import sys
-
+import pandas as pd
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
@@ -33,20 +34,140 @@ def main():
 
     dct_stats = statistics(ds)
 
-    # add lidar data 
-    lidar_ds = read_all_lidar_diurnal_cycle_files(path_diurnal_cycle_arthus)
-    fluxes_ds = read_fluxes(path_diurnal_cycle_arthus)
-    hw_ds = read_h_wind(path_diurnal_cycle_arthus)
     
-    # calculate heights with respect to lcl
-    hw_ds = hw_ds.rename({'height_h':'height', 'time_h':'time'})
-    hw_lcl = calc_lcl_grid(hw_ds)
-    hw_lcl = hw_lcl.rename({'height':'height_h', 'time':'time_h'})
-    print(hw_lcl)
+    # read and regrid lidar data with respect to lcl    
+    da_T_lcl, da_MR_lcl, da_HW_lcl, da_LF_lcl, da_SF_lcl = read_and_regrid_lidar_wrt_lcl(path_diurnal_cycle_arthus)
+  
+    
+    # call plotting script to produce plot of the publication
+    plot_diurnal(dct_stats, da_T_lcl, da_MR_lcl, da_HW_lcl, da_LF_lcl, da_SF_lcl)
 
-    strasuka
+
+
+
+
+def calc_diurnal_lcl(ds, path_out, avg_time='15'):
+    '''
+    function to calculate diurnal cycle for lcl data
+
+    '''
+    # calculating the mean of the variable over the time interval requested
+    ds = ds.resample(time=avg_time+'T').mean()
+    # re-writing time array as hh:mm for then being able to group
+    ds['time'] = pd.to_datetime(ds.time.values).strftime("%H:%M")
+    # grouping and calculating mean of the profiles
+    grouped_mean = ds.groupby('time').mean()
     
-    plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds)
+    
+    # storing diurnal cycle in ncdf file
+    dims             = ['time']
+    coords           = {"time":pd.to_datetime(grouped_mean['time'].values)}
+    lcl_diurnal  = xr.DataArray(dims=dims, coords=coords, data=grouped_mean['lcl'].values,\
+                         attrs={'long_name':'diurnal cycle over '+avg_time+'min for '+'lcl',\
+                                'units':'m'})
+    
+    global_attributes = {'CREATED_BY'       : 'Claudia Acquistapace',
+                        'CREATED_ON'       :  str(datetime.now()),
+                        'FILL_VALUE'       :  'NaN',
+                        'AUTHOR_NAME'          : 'Claudia Acquistapace',
+                        'AUTHOR_AFFILIATION'   : 'University of Cologne (UNI), Germany',
+                        'AUTHOR_ADDRESS'       : 'Institute for geophysics and meteorology, Pohligstrasse 3, 50969 Koeln',
+                        'AUTHOR_MAIL'          : 'cacquist@meteo.uni-koeln.de',
+                        'DATA_DESCRIPTION' : 'diurnal cycle of the surface weather station variables calculated on '+avg_time+'minutes',
+                        'DATA_DISCIPLINE'  : 'Atmospheric Physics - weather station on wband radar',
+                        'DATA_GROUP'       : 'Experimental;Moving',
+                        'DATA_SOURCE'      : 'wband radar data',
+                        'DATA_PROCESSING'  : 'https://github.com/ClauClouds/rain_paper_QJRSM/',
+                        'INSTRUMENT_MODEL' : '',
+                         'COMMENT'         : 'original data postprocessed by Claudia Acquistapace' }
+    ds_lcl_dc    = xr.Dataset(data_vars = {'lcl_dc':lcl_diurnal},
+                                       coords = coords,
+                                       attrs = global_attributes)
+    # storing data to ncdf
+    ds_lcl_dc.to_netcdf(path_out+'_lcl_diurnal_cycle.nc',
+                   encoding={'lcl_dc':{"zlib":True, "complevel":9},\
+                    "time": {"units": "seconds since 2020-01-01", "dtype": "i4"}})
+    
+    return ds_lcl_dc
+
+def read_and_regrid_lidar_wrt_lcl(path_to_dc_files):
+    """_summary_
+
+    Args:
+        path_to_dc_files (_type_): _description_
+        
+    Dependencies: 
+    - read_all_lidar_diurnal_cycle_files
+    - read_lcl
+    - calc_diurnal_lcl
+    """
+    
+    # read datasets of diurnal cycle
+    lidar_ds = read_all_lidar_diurnal_cycle_files(path_to_dc_files)
+    fluxes_ds = read_fluxes(path_to_dc_files)
+    hw_ds = read_h_wind(path_to_dc_files)
+        
+    # read lcl and calculate its diurnal cycle at 15 mins and at 30 mins (for fluxes)
+    ds_lcl = read_lcl()
+    ds_lcl_diurnal_15 = calc_diurnal_lcl(ds_lcl, path_diurnal_cycle_arthus, '15')
+    ds_lcl_diurnal_30 = calc_diurnal_lcl(ds_lcl, path_diurnal_cycle_arthus, '30')
+
+    # convert to height grid referred to lcl all variables
+    T_lcl = calc_lcl_grid(lidar_ds, ds_lcl_diurnal_15, 'Height', 'Time', 'T')
+    MR_lcl = calc_lcl_grid(lidar_ds, ds_lcl_diurnal_15, 'Height', 'Time', 'MR')
+    HW_lcl = calc_lcl_grid(hw_ds, ds_lcl_diurnal_15, 'height_h', 'time_h', 'HW')
+    LF_lcl = calc_lcl_grid(fluxes_ds, ds_lcl_diurnal_30, 'height_coarse', 'time_coarse', 'LHF')
+    SF_lcl = calc_lcl_grid(fluxes_ds, ds_lcl_diurnal_30, 'height_coarse', 'time_coarse', 'SHF')
+
+    return(T_lcl, MR_lcl, HW_lcl, LF_lcl, SF_lcl)
+
+def calc_lcl_grid(ds, lcl_ds, height_var, time_var, var_name):
+    """
+    function to convert and reinterpolate data on the height referred to the lcl height
+
+    Args:
+        ds (xarray dataset): dataset containing the data to be regridded
+        lcl_ds (_type_): _description_
+        height_var (_type_): _description_
+        time_var (_type_): _description_
+        var_name (_type_): _description_
+    """
+    dz = 7.45
+
+    # rename time and height in standard way for processing
+    ds = ds.rename({height_var:'height', time_var:'time'})
+
+    # adding lcl to the dataset variables (also diurnal cycle)
+    ds['lcl_dc'] = lcl_ds.lcl_dc.values
+    
+    # reading dataarray of the input variable and of lcl
+    da_var = ds[var_name]
+    da_lcl = ds.lcl_dc
+
+    # interpolate data on regular height grid of 7.45 m that covers the
+    # height difference to the lcl
+    z_rel = np.arange(
+        da_var.height.min() - da_lcl.max(),
+        da_var.height.max() - da_lcl.min() + dz,
+        dz,
+    )
+    z_rel = z_rel - z_rel[z_rel > 0].min()  # center around zero
+
+    da_var = da_var.interp(
+        height=z_rel, method="nearest", kwargs={"fill_value": 0}
+    )
+
+    
+    # calculate shift of all height values at each time step
+    # positive shift means each height bin is shifted downward
+    rows, columns = np.ogrid[: da_var.shape[0], : da_var.shape[1]]  # 2d indices
+    shift = ((da_lcl + dz / 2) // dz).values.astype("int16")
+    columns = columns + shift[:, np.newaxis]
+    columns[columns >= columns.shape[1]] = columns.shape[1] - 1  # upper bound
+    da_var[:] = da_var.values[rows, columns]
+    
+    return(da_var)
+
 
 def statistics(ds):
     """
@@ -127,58 +248,6 @@ def statistics(ds):
     )
     return dct_stats
 
-
-def calc_lcl_grid(data):
-    """
-    funcction to regrid heights of the input dataset as a function of
-    distance from lcl
-
-    Args:
-        data (xarray dataset): input data
-    """
-    from readers.lcl import read_lcl
-
-    # lifting condensation level
-    ds_lcl = read_lcl()
-    print(ds_lcl)
-    
-    ds = data.load()
-    
-    # interp lcl data on ds time 
-    ds_lcl = ds_lcl.interp(time=ds.time)
-    plt.plot(ds_lcl.time.values, ds_lcl.lcl.values)
-    
-    # align both time series
-    data, ds_lcl = xr.align(data, ds_lcl)
-    assert len(ds_lcl.time) == len(data.time)
-
-    da_lcl = ds_lcl.lcl
-    print(da_lcl)
-    print(np.nanmin(ds.height), np.nanmax(ds.heigth))
-    starsuka
-    # interpolate data on regular height grid of 7.45 m that covers the
-    # height difference to the lcl
-    dz = 7.45
-    print(ds.height.min(), ds.height.max(), da_lcl.max(), da_lcl.min())
-    z_rel = np.arange(
-        ds.height.min() - da_lcl.max(),
-        ds.height.max() - da_lcl.min() + dz,
-        dz,
-    )
-    z_rel = z_rel - z_rel[z_rel > 0].min()  # center around zero
-    ds = ds.interp(
-        height=z_rel, method="nearest", kwargs={"fill_value": 0}
-    )
-    
-    
-    # calculate shift of all height values at each time step
-    # positive shift means each height bin is shifted downward
-    rows, columns = np.ogrid[: data.shape[0], : data.shape[1]]  # 2d indices
-    shift = ((ds_lcl + dz / 2) // dz).values.astype("int16")
-    columns = columns + shift[:, np.newaxis]
-    columns[columns >= columns.shape[1]] = columns.shape[1] - 1  # upper bound
-    ds[:] = ds.values[rows, columns]
-    return(ds)
     
 def prepare_data():
     
@@ -212,7 +281,7 @@ def prepare_data():
 
 
 
-def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
+def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
     """
     Plot diurnal cycle
     """
@@ -232,32 +301,39 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
     rel_occ_co_nr_diurnal=dct_stats["rel_occ_co_nr_diurnal"]
     occ_co_r=dct_stats["occ_co_r"]
     occ_co_nr=dct_stats["occ_co_nr"]
-    temp = lidar_ds['T']
-    MR = lidar_ds['MR']
-    HW = hw_ds['HW']
-    SHF = fluxes_ds['SHF']
-    LHF = fluxes_ds['LHF']
-    time_lidar = pd.to_datetime(lidar_ds.Time.values).hour
-    time_coarse_lidar = pd.to_datetime(fluxes_ds.time_coarse.values).hour
-    time_h =pd.to_datetime(hw_ds.time_h.values).hour
-    
+    #time_MR = pd.to_datetime(da_MR.time.values).hour
+    #time_T = time_MR
+    #time_HW =pd.to_datetime(da_HW.time.values).hour
+    #time_LF =pd.to_datetime(da_LF.time.values).hour
+    #time_SF = time_LF    
+    #h_MR
+    # defining masks for each data from lidar
+    mask_T = np.ma.masked_where(da_T.values > 0. ,da_T.values)
+    mask_MR = np.ma.masked_where(da_MR.values > 0. ,da_MR.values)
+    mask_HW = np.ma.masked_where(da_HW.values > 0. ,da_HW.values)
+    mask_LF = np.ma.masked_where(da_LF.values > 0. ,da_LF.values)
+    mask_SF = np.ma.masked_where(da_SF.values > 0. ,da_SF.values)
+
     norm = mcolors.BoundaryNorm(np.arange(0, 0.81, 0.05), CMAP.N)
 
     fig, axes = plt.subplots(5, 2, figsize=(25, 20), constrained_layout=True)
 
     axes[0,0].annotate(
-        "a) Shallow (#{:,})".format(occ_sh.values),
+        "a) Shallow hydrometeor fraction (#{:,})".format(occ_sh.values),
         xy=(0, 1),
         xycoords="axes fraction",
         va="bottom",
         ha="left",
+        fontsize=25,
     )
     axes[1,0].annotate(
-        "b) Congestus (#{:,})".format(occ_co.values),
+        "b) Congestus hydrometeor fraction (#{:,})".format(occ_co.values),
         xy=(0, 1),
         xycoords="axes fraction",
         va="bottom",
         ha="left",
+        fontsize=25,
+
     )
     
     axes[2,0].annotate(
@@ -266,6 +342,7 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
         xycoords="axes fraction",
         va="bottom",
         ha="left",
+        fontsize=25,
     )
     
     axes[3,0].annotate(
@@ -274,6 +351,7 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
         xycoords="axes fraction",
         va="bottom",
         ha="left",
+        fontsize=25,
     )
 
     axes[4,0].annotate(
@@ -282,6 +360,7 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
         xycoords="axes fraction",
         va="bottom",
         ha="left",
+        fontsize=25,
     )
 
     kwargs = dict(shading="nearest", cmap=CMAP, norm=norm)
@@ -344,22 +423,32 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
         linestyle=':', 
         linewidth=3,
     )
-    leg = axes[2,0].legend(loc="lower left", ncol=4)
-    leg.set_in_layout(False)
+    
+    axes[4,0].legend(loc="upper right", frameon=False, fontsize=15)
+    
+    #leg.set_in_layout(False)
 
     for ax in axes[1:4,0]:
-        ax.set_ylabel("Height above\nLCL [km]")
+        ax.set_ylabel("Height above\nLCL [km]", fontsize=25)
         ax.set_yticks(np.arange(-0.5, 4.5, 0.25), minor=True)
+        ax.set_yticklabels([-1, -0.5, "LCL", 0.5, 1., 1.5], fontsize=20)
 
-    for ax in axes[:,0]:
+    for ax in axes[:,0].flatten():
         ax.set_xticks(np.arange(0, 24, 2))
         ax.set_xticks(np.arange(0, 24, 1), minor=True)
-        ax.set_xticklabels(np.arange(0, 24, 2))
+        ax.set_xticklabels(np.arange(0, 24, 2), fontsize=20)
         ax.set_xlim([-0.5, 23.5])
+    for ax in axes[:,1].flatten():
+        ax.set_xticks(np.arange(0, 24, 2))
+        ax.set_xticks(np.arange(0, 24, 1), minor=True)
+        ax.set_xticklabels(np.arange(0, 24, 2), fontsize=20)
+        ax.set_xlim([0, 24])
 
     # shallow axis
     axes[0,0].set_yticks(np.arange(-1, 1, 0.5))
-    axes[0,0].set_yticklabels([-1, -0.5, "LCL", 0.5])
+    axes[0,0].set_ylabel("Height above\nLCL [km]", fontsize=25)
+
+    axes[0,0].set_yticklabels([-1, -0.5, "LCL", 0.5], fontsize=20)
     axes[0,0].set_ylim(
         [
             hf_sh_diurnal.height.isel(
@@ -373,7 +462,7 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
     # congestus axis
     for ax in axes[1:-1,0]:
         ax.set_yticks(np.arange(-1, 5, 1))
-        ax.set_yticklabels([-1, "LCL", 1, 2, 3, 4])
+        ax.set_yticklabels([-1, "LCL", 1, 2, 3, 4], fontsize=20)
         ax.set_ylim(
             [
                 hf_sh_diurnal.height.isel(
@@ -385,8 +474,9 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
         )
 
     axes[4,0].set_ylim([0, 0.07])
-    axes[4,0].set_ylabel("Density [h$^{-1}$]")
-    axes[4,0].set_xlabel("Hour [LT, UTC-4]")
+    axes[4,0].set_ylabel("Density [h$^{-1}$]", fontsize=25)
+    axes[4,0].set_xlabel("Hour [LT, UTC-4]", fontsize=25)
+    axes[4,1].set_xlabel("Hour [LT, UTC-4]", fontsize=25)
 
 
     axes[0,1].annotate(
@@ -395,6 +485,7 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
         xycoords="axes fraction",
         va="bottom",
         ha="left",
+        fontsize=25,
     )
     axes[1,1].annotate(
         "g) Water vapor mixing ratio ",
@@ -402,6 +493,7 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
         xycoords="axes fraction",
         va="bottom",
         ha="left",
+        fontsize=25,
     )
     
     axes[2,1].annotate(
@@ -410,6 +502,7 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
         xycoords="axes fraction",
         va="bottom",
         ha="left",
+        fontsize=25,
     )
     
     axes[3,1].annotate(
@@ -418,76 +511,200 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
         xycoords="axes fraction",
         va="bottom",
         ha="left",
+        fontsize=25,
     )
 
     axes[4,1].annotate(
-        "f) Latent heat flux",
+        "j) Latent heat flux",
         xy=(0, 1),
         xycoords="axes fraction",
         va="bottom",
         ha="left",
+        fontsize=25,
     )
     
-    fig.colorbar(
+    cbar_hf = fig.colorbar(
         im,
         ax=axes[:4,0],
-        label="Hydrometeor fraction",
-        ticks=np.arange(0, 0.7, 0.1),
+        ticks=np.arange(0, 0.8, 0.1),
     )
+    cbar_hf.set_label("Hydrometeor fraction",fontsize=20)
+    cbar_hf.ax.tick_params(labelsize=20)  
 
     kwargs_lidar = dict(shading="nearest", cmap=CMAP)
-    im = axes[0,1].pcolormesh(
-        time_lidar, 
-        lidar_ds.Height.values,
-        temp.T,
-        vmin=290,
+    im_T = axes[0,1].pcolormesh(
+        pd.to_datetime(da_T.time.values).hour,
+        da_T.height.values* 1e-3,
+        da_T.T,
+        vmin=296,
         vmax=300,
         **kwargs_lidar
     )
-    im = axes[1,1].pcolormesh(
-        time_lidar, 
-        lidar_ds.Height.values,
-        MR.T,
-        vmin=10,
+    # mesh over nan areas
+    c_T = axes[0,1].contourf(pd.to_datetime(da_T.time.values).hour,
+        da_T.height.values* 1e-3,
+        mask_T.T, 
+        hatches='//',
+        cmap='gray', extend='both', alpha=1)
+    
+    
+    im_MR = axes[1,1].pcolormesh(
+        pd.to_datetime(da_MR.time.values).hour,
+        da_MR.height.values* 1e-3,
+        da_MR.T,
+        vmin=12,
         vmax=18,
         **kwargs_lidar
     )
-    
-    im = axes[2,1].pcolormesh(
-        time_h, 
-        hw_ds.height_h.values,
-        HW.T,
-        vmin=6,
+    # mesh over nan areas
+    c_MR = axes[1,1].contourf(pd.to_datetime(da_MR.time.values).hour,
+        da_MR.height.values* 1e-3,
+        mask_MR.T, 
+        hatches='//',
+        cmap='gray', extend='both', alpha=1)
+       
+    im_HW = axes[2,1].pcolormesh(
+        pd.to_datetime(da_HW.time.values).hour,
+        da_HW.height.values* 1e-3,
+        da_HW.T,
+        vmin=7,
         vmax=10,
         **kwargs_lidar
     )
+    # mesh over nan areas
+    c_HW = axes[2,1].contourf(pd.to_datetime(da_HW.time.values).hour,
+        da_HW.height.values* 1e-3,
+        mask_HW.T, 
+        hatches='//',
+        cmap='gray', extend='both', alpha=1)
     
-    im = axes[3,1].pcolormesh(
-        time_coarse_lidar,
-        fluxes_ds.height_coarse.values,        
-        SHF.T,
-        vmin=-20,
+    im_SF = axes[3,1].pcolormesh(
+        pd.to_datetime(da_SF.time.values).hour,
+        da_SF.height.values* 1e-3,
+        da_SF.T,
+        vmin=-10,
         vmax=20,
         **kwargs_lidar
     )
+    # mesh over nan areas
+    c_SF = axes[3,1].contourf(pd.to_datetime(da_SF.time.values).hour,
+        da_SF.height.values* 1e-3,
+        mask_SF.T, 
+        hatches='//',
+        cmap='Greys', extend='both', alpha=0.6)    
     
-    axes[4,1].pcolormesh(
-        time_coarse_lidar,
-        fluxes_ds.height_coarse.values,  
-        LHF.T, 
-        vmin=30,
+    
+    im_LF = axes[4,1].pcolormesh(
+        pd.to_datetime(da_LF.time.values).hour,
+        da_LF.height.values* 1e-3,
+        da_LF.T,
+        vmin=-10,
         vmax=100,
         **kwargs_lidar,
     )
-
-
-    for ax in axes[:,1]:
-        ax.set_ylabel("Height above\nLCL [km]")
-        #ax.set_yticks(np.arange(-0.5, 4.5, 0.25), minor=True)
-        ax.set_ylim(0., 1200)
-        #ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-
+    # mesh over nan areas
+    c_LF = axes[4,1].contourf(pd.to_datetime(da_LF.time.values).hour,
+        da_LF.height.values* 1e-3,
+        mask_LF.T, 
+        hatches='//',
+        cmap='Greys', extend='both', alpha=0.6)    
+    
         
+    # T/MR axis
+    axes[0,1].set_yticks(np.arange(-1, 1, 0.5))
+    axes[0,1].set_ylabel("Height above\nLCL [km]", fontsize=25)
+    axes[0,1].set_yticklabels([-1, -0.5, "LCL", 0.5], fontsize=20)
+    axes[0,1].set_ylim(-0.5, 0.2)
+    #    [
+    ##        da_T.height.isel(
+    #            height=da_T.any("time").values.argmax()
+    ##        )
+    #        * 1e-3,
+    #        0.6,
+    #    ]
+    #)
+
+    axes[1,1].set_ylabel("Height above\nLCL [km]", fontsize=25)
+    axes[1,1].set_yticks(np.arange(-1, 1, 0.5))
+    axes[1,1].set_yticklabels([-1, -0.5, "LCL", 0.5], fontsize=20)
+    axes[1,1].set_ylim(-0.5, 0.2)
+    #    [
+    #        da_MR.height.isel(
+    #            height=da_MR.any("time").values.argmax()
+    #        )
+    #        * 1e-3,
+    #        0.6,
+    #    ]
+    #)
+         
+    # HW axis
+    axes[2,1].set_ylabel("Height above\nLCL [km]", fontsize=25)
+    axes[2,1].set_yticks(np.arange(-1, 1, 0.5), minor=True)
+    axes[2,1].set_yticklabels([-1, -0.5, "LCL", 0.5, 1, 1.5], fontsize=20)
+    axes[2,1].set_ylim(
+        [
+            da_HW.height.isel(
+                height=da_HW.any("time").values.argmax()
+            )
+            * 1e-3,
+            0.3,
+        ]
+    )
+       
+    # LHF/SHF axis
+    axes[3,1].set_ylabel("Height above\nLCL [km]", fontsize=25)
+    axes[3,1].set_yticks(np.arange(-1, 1, 0.5))
+    axes[3,1].set_ylim(-0.5, 0.2)
+    axes[3,1].set_yticklabels([-1, -0.5, "LCL", 0.5], fontsize=20)
+
+    axes[4,1].set_ylabel("Height above\nLCL [km]", fontsize=25)
+    axes[4,1].set_yticks(np.arange(-1, 1, 0.5))
+    axes[4,1].set_yticklabels([-1, -0.5, "LCL", 0.5], fontsize=20)
+    axes[4,1].set_ylim(-0.5, 0.2)
+    
+    # set now all colorbars for lidar plots
+    
+    cbar = fig.colorbar(
+        im_T,
+        ax=axes[0,1],
+        ticks=np.arange(296, 300, 1),
+    )
+    cbar.set_label('[K]', fontsize=20)
+    cbar.ax.tick_params(labelsize=20)  
+    
+    cbar = fig.colorbar(
+        im_MR,
+        ax=axes[1,1],
+        label="[gkg$^{-1}$]",
+        ticks=np.arange(12, 18, 1),
+    )
+    cbar.set_label("[Kgm$^{-2}$]", fontsize=20)
+    cbar.ax.tick_params(labelsize=20)  
+
+    cbar = fig.colorbar(
+        im_HW,
+        ax=axes[2,1],
+        ticks=np.arange(7, 10, 0.5),
+    )
+    cbar.set_label("[m$^{-1}$]",fontsize=20)
+    cbar.ax.tick_params(labelsize=20)  
+
+    cbar = fig.colorbar(
+        im_SF,
+        ax=axes[3,1],
+        ticks=np.arange(-10, 20, 5),
+    )
+    cbar.set_label("[Wm$^{-2}$]", fontsize=20)
+    cbar.ax.tick_params(labelsize=20)  
+     
+    cbar = fig.colorbar(
+        im_LF,
+        ax=axes[4,1],
+        ticks=np.arange(-10, 100, 10),
+    )   
+    cbar.set_label("[Wm$^{-2}$]", fontsize=20)
+    cbar.ax.tick_params(labelsize=20)  
+    
     for ax in (axes[:,:].flatten()):
         ax.grid(False)
 
@@ -496,5 +713,8 @@ def plot_diurnal(dct_stats, ds, lidar_ds, fluxes_ds, hw_ds):
             path_paper_plots, "diurnal.png"
         ),
     )
+    
+        
+        
 if __name__ == "__main__":
     main()

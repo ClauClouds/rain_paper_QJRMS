@@ -213,6 +213,9 @@ def  plot_diurnal_surface_vars(surf_diurnal_cycle):
     fig.savefig('/work/plots_rain_paper/surface_diurnal_cycles.png', transparent=True)
     plt.close()
     
+
+
+    
     
     
 if __name__ == "__main__":
