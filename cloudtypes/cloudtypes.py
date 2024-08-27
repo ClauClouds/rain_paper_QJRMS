@@ -11,13 +11,13 @@ import sys
 
 import numpy as np
 import xarray as xr
-from dask.diagnostics import ProgressBar
 
 sys.path.append("../")
 
 from readers.lcl import read_lcl
 from readers.position import read_position
 from readers.radar import read_radar_multiple
+from dask.diagnostics import ProgressBar
 
 ProgressBar().register()
 
