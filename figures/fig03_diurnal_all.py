@@ -133,9 +133,10 @@ def calc_lcl_grid(ds, lcl_ds, height_var, time_var, var_name):
         var_name (_type_): _description_
     """
     dz = 7.45
-
-    # rename time and height in standard way for processing
-    ds = ds.rename({height_var:'height', time_var:'time'})
+    
+    if height_var != 'height' & time_var != 'time':
+        # rename time and height in standard way for processing
+        ds = ds.rename({height_var:'height', time_var:'time'})
 
     # adding lcl to the dataset variables (also diurnal cycle)
     ds['lcl_dc'] = lcl_ds.lcl_dc.values
