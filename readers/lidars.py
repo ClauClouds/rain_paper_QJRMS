@@ -497,7 +497,7 @@ def read_anomalies(measurement):
     """
     function to read arthus anomalies files
     """
-    data = xr.open_dataset('/net/ostro/4sibylle/diurnal_cycle_arthus/anomalies_fields/'+measurement + '_arthus_anomaly.nc')    
+    data = xr.open_dataset('/net/ostro/4sibylle/diurnal_cycle_arthus/5_mins/anomalies/'+measurement + '_arthus_anomaly.nc')    
     
     return data
     
