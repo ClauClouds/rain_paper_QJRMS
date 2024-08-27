@@ -189,7 +189,7 @@ def plot_diurnal(
 
     for ax in axes[:2]:
         ax.set_ylabel("Height above\nLCL [km]")
-        ax.set_yticks(np.arange(-0.5, 4.5, 0.25), minor=True)
+        ax.set_yticks(np.arange(-0.5, 4.5, 0plt.25), minor=True)
 
     for ax in axes:
         ax.set_xticks(np.arange(0, 24, 2))
@@ -218,7 +218,7 @@ def plot_diurnal(
             hf_sh_diurnal.height.isel(
                 height=hf_co_diurnal.any("hour").values.argmax()
             )
-            * 1e-3,
+            * 1e-3,plt
             4,
         ]
     )
