@@ -23,3 +23,22 @@ def read_lcl():
     )
 
     return ds
+
+def read_diurnal_cycle_lcl(path_to_file):
+    
+    """
+    Read diurnal cycle of lcl file
+
+    Returns
+    -------
+    ds: lifting condensation level diurnal cycle dataset
+    """
+
+    ds = xr.open_dataset(
+        os.path.join(
+            path_to_file, 
+            "_lcl_diurnal_cycle.nc",
+        )
+    )
+
+    return ds
