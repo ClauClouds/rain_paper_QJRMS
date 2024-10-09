@@ -133,8 +133,8 @@ def calc_lcl_grid(ds, lcl_ds, height_var, time_var, var_name):
         var_name (_type_): _description_
     """
     dz = 7.45
-    
-    if height_var != 'height' & time_var != 'time':
+    print(height_var, time_var)
+    if (height_var != 'height') and (time_var != 'time'):
         # rename time and height in standard way for processing
         ds = ds.rename({height_var:'height', time_var:'time'})
 
@@ -162,11 +162,14 @@ def calc_lcl_grid(ds, lcl_ds, height_var, time_var, var_name):
     # calculate shift of all height values at each time step
     # positive shift means each height bin is shifted downward
     rows, columns = np.ogrid[: da_var.shape[0], : da_var.shape[1]]  # 2d indices
+    print('shape of columns', np.shape(columns))
+    print('shape of rows', np.shape(rows))
     shift = ((da_lcl + dz / 2) // dz).values.astype("int16")
     columns = columns + shift[:, np.newaxis]
     columns[columns >= columns.shape[1]] = columns.shape[1] - 1  # upper bound
     da_var[:] = da_var.values[rows, columns]
-    
+    print(da_var)
+    strasuka
     return(da_var)
 
 
