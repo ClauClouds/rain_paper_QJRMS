@@ -9,7 +9,7 @@ subplots:
 2) second row: 3 subpanel with anomalies of vertical velocity, specific humidity and virtual pot temp
 3) third row: 2 subpanels with vd vz Ze and sk vs Ze
 """
-
+from readers.ship import read_ship_pressure
 from readers.lidars import read_anomalies
 from readers.cloudtypes import read_cloud_class, read_rain_ground
 from cloudtypes.path_folders import path_diurnal_cycle_arthus, path_paper_plots
@@ -45,29 +45,70 @@ def main():
     
     # second row of plots: derive specific humidity and virtual potential temperature from lidar data
     ds_therm = calc_thermo_prop()
-    strasuka
+    ds_therm = xr.align(ds_therm, ds_ct, ds_cp, join="inner")
+    
+    # regrid heights with respect to lcl
+    ds_therm_lcl = calc_lcl_grid_no_dc(ds_therm, lcl_ds, ds_class, height_var, time_var, var_name)
+    #plot_q_theta_check(ds_therm, path_paper_plots)
+
+    # align cloud type flags and rain ground flag
+    ds_therm_sl, ds_therm_cg, ds_therm_sl_prec, ds_therm_sl_nonprec, ds_therm_cg_prec, ds_therm_cg_nonprec = assign_flags_to_profiles(ds_therm, ds_cp, ds_r)
+
+    
     # second row of plots: read lidar data
+    
     # prepare data (calculate mean and std of the profiles for shallow/congestus in prec and non prec)
     ds_sl, ds_cg, ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec = prepare_anomaly_profiles(ds_cp, "VW", lcl_dc)
     
-    plot_w_subfigure(ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, path_paper_plots)
+    plot_w_subfigure(ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, path_paper_plots, 'w_subcloud_lcl')
     
+    plot_w_subfigure(ds_therm_sl_prec, ds_therm_sl_nonprec, ds_therm_cg_prec, ds_therm_cg_nonprec, path_paper_plots, 'therm_subcloud_lcl')
 
     
     
     #plot_figure(lcl_dc, dct_vw_q)
+def assign_flags_to_profiles(ds_therm, ds_cp, ds_r):
+    
+    # align cloud type flags and rain ground flag
+    ds_therm, ds_cp, ds_r = xr.align(ds_therm, ds_cp, ds_r, join="inner")
+    
+    # selecting cloud types and rain/norain conditions
+    is_shallow = ds_cp.shape == 0
+    is_congestus = ds_cp.shape == 1
+
+    # selecting prec and non prec
+    is_prec_ground = ds_cp.flag_rain_ground == 1
+    
+    # defining classes 
+    is_cg_prec = is_congestus & is_prec_ground
+    is_cg_non_prec = is_congestus & ~is_prec_ground 
+    is_sl_prec = is_shallow & is_prec_ground
+    is_sl_non_prec = is_shallow & ~is_prec_ground 
+
+    # segregating with respect to shallow and deep clouds
+    ds_sl_prec = ds_therm.isel(time=is_sl_prec)
+    ds_sl_nonprec = ds_therm.isel(time=is_sl_non_prec)
+    ds_cg_prec = ds_therm.isel(time=is_cg_prec)
+    ds_cg_nonprec = ds_therm.isel(time=is_cg_non_prec)
+    
+    ds_sl = ds_therm.isel(time=is_shallow)
+    ds_cg = ds_therm.isel(time=is_congestus)
+    
+    return ds_sl, ds_cg, ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec
+
 
 def calc_thermo_prop():
     """
     function to calculate thermodynamic properties from lidar data
     """
-    from readers.lidars import read_diurnal_cycle, f_call_postprocessing_arthus, f_read_variable_dictionary
+    from readers.lidars import f_call_postprocessing_arthus, f_read_variable_dictionary
 
     # read lidar data for temperature and humidity
     
     # loop on variables 
     var_string_arr = ['T', 'MR']
     arthus_data = []
+    
     for ind, var_string in enumerate(var_string_arr):
 
         print(var_string)
@@ -77,7 +118,7 @@ def calc_thermo_prop():
 
         # call postprocessing routine for arthus data
         data = f_call_postprocessing_arthus(var_string)
-        print(data)
+
         # rename variables to create a dataset with all variables together
         ds = data.rename({'Height':'height', "Time":'time', 'Product':var_string})
 
@@ -93,47 +134,128 @@ def calc_thermo_prop():
     ds_arthus = arthus_data[0].merge(arthus_data[1])
     
     # calculation of specific humidity variable
-    q = ds_arthus.MR.values/(1+ds_arthus.MR.values) # g/kg
-    
-    # calculation of virtual temperature
-    tv = arthus_data.T.values *(1+0.608*q)  
-    
-    # calculate pressure using hypsometric equation
-    P = np.zeros((len(arthus_data.time.values), len(arthus_data.height.values)))
+    mr = ds_arthus.MR.values* 10**(-3) # g/kg to g/g
 
-    # calculate increments in heights
-    height_diffs = np.diff(arthus_data.height.values)
+    q = mr/(1+mr) # g/g
+    q = q*10**(3)   # g/kg
+    print('shape of q', np.shape(q))
     
-    # calculate pressure at the surface
-    P[indTime, 0] = 100000 #Pa
-    g = 9.8 # MS-2
-    R_prime = 287.058 # J Kg-1 K-1
-    for ind_t in range(len(arthus_data.time.values)):
-        for ind_h in range(len(arthus_data.height.values)):
-            P[ind_t, ind_h] = P[ind_t, 0] * np.exp(-g * (height_diffs[ind_h]/(R_prime*tv[ind_t, ind_h])))
-                                                                
-          
-    # calculation of potential and virtual potential temperature (P in pascal)
+    
+    # calculating virtual temperature using lidar data
+    Tv = ds_arthus.T.values * (1 + 0.61 *ds_arthus.MR.values* 10**(-3)) # K
+    dims   = ['time', 'height']
+    coords = {"time":ds_arthus.time.values, "height":ds_arthus.height.values}
+    Tv_data    = xr.DataArray(dims=dims, coords=coords, data=Tv,
+                 attrs={'long_name':'virtual temperature',
+                        'units':'$^{\circ}$K'})
+    ds_arthus['Tv'] = Tv_data
+    
+    print('shape of TV', np.shape(Tv_data))
+
+    # reading surface pressure from ship data re-sampled
+    ship_data = read_ship_pressure()
+    ship_arthus = ship_data.interp(time=ds_arthus.time.values, method='nearest')
+    P_surf = ship_arthus.P.values
+
+    print('shape of P_surf', np.shape(P_surf))
+    
+    # calculate pressure using hydrostatic equation and surface pressure values from ship data
+    dim_t = len(ds_arthus.time.values)
+    dim_h = len(ds_arthus.height.values)
+    height = ds_arthus.height.values
+    P = np.zeros((dim_t, dim_h))
+    P.fill(np.nan)
+    
+    # calculate mean TV for each profile
+    ds_mean = ds_arthus.mean(dim='height', skipna=True)
+    Tv_mean = ds_mean.Tv.values
+    
+    g = 9.8 # ms-2
+    Rd = 287  # J (Kg K)-1
+    for ind_height in range(dim_h):
+        P[:,ind_height] = P_surf * np.exp( - (g *(height[ind_height]-20.))/(Rd*Tv_mean))
+
+    print('shape of P', np.shape(P))
+    
+    # calculating profiles of virtual potential temperature
+    Theta_v = np.zeros((dim_t, dim_h))
+    Cp = 1004. # [J Kg-1 K-1]
     Rd = 287.058  # gas constant for dry air [Kg-1 K-1 J]
-    Cp = 1004.
-    Theta = np.zeros((len(arthus_data.time.values), len(arthus_data.height.values)))
-    Theta_v =  np.zeros((len(arthus_data.time.values), len(arthus_data.height.values)))
-    for indTime in range(len(arthus_data.time.values)):
-        for indHeight in range(len(arthus_data.height.values)):
-            
-            k_val = Rd*(1-0.23*arthus_data.MR.values[indTime, indHeight])/Cp
-            
-            Theta_v[indTime, indHeight] = ( (1 + 0.61 * arthus_data.MR.values[indTime, indHeight]) * \
-                   arthus_data.T.values[indTime, indHeight] * (100000./P[indTime, indHeight])**k_val)
-            Theta[indTime, indHeight]   = arthus_data.T.values[indTime, indHeight] * (100000./P[indTime, indHeight])**k_val
-    
-    
-    
-    print(ds_arthus)
+    mr = ds_arthus.MR.values* 10**(-3) # g/kg to g/g
+    T = ds_arthus.T.values
+    for indHeight in range(dim_h):
+        k = Rd*(1-0.23*mr[:, indHeight])/Cp
+        Theta_v[:,indHeight] = ( (1 + 0.61 * mr[:, indHeight]) * T[:, indHeight] * (P_surf/P[:,indHeight])**k)
     
 
+    # store q, theta and theta_v in dataset
+    ds_out = xr.Dataset(
+        {
+            "q": (["time", "height"], q),
+            "theta_v": (["time", "height"], Theta_v),
+        },
+        coords={"time": ds_arthus.time, "height": ds_arthus.height},
+    )
     
-def plot_w_subfigure(ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, path_paper_plots):
+    # add units attributtes to q, theta and theta_v
+    ds_out.q.attrs["units"] = "g/kg"
+    ds_out.theta_v.attrs["units"] = "K"
+    
+    print(ds_out)
+    return(ds_out)
+
+
+
+def plot_q_theta_check(ds, path_paper_plots):
+    
+    print(ds)
+    
+    fig, axs = plt.subplots(1, 2, figsize=(15, 5), constrained_layout=True)
+    
+    axs[0].annotate(
+        "a) specific humidity",
+        xy=(0, 1),
+        xycoords="axes fraction",
+        ha="left",
+        va="bottom",
+    )
+    
+    axs[1].annotate(
+        "b) virtual potential temperature",
+        xy=(0, 1),
+        xycoords="axes fraction",
+        ha="left",
+        va="bottom",
+    ) 
+    
+    mesh_q = axs[0].pcolormesh(ds.time.values, ds.height, ds.q.T, cmap=CMAP, vmin=10, vmax=18)
+    # add colorbar
+    
+    cbar = plt.colorbar(mesh_q, ax=axs[0], orientation='vertical')
+    cbar.ax.tick_params(labelsize=25) 
+    cbar.set_label('g/kg', fontsize=20)
+    axs[0].set_ylabel("Height [m]", fontsize=20)
+    axs[0].set_xlabel("Time", fontsize=20)
+    
+    mesh_theta = axs[1].pcolormesh(ds.time.values, ds.height, ds.theta_v.T, cmap=CMAP, vmin=295, vmax=301)
+    # add colorbar
+    cbar = plt.colorbar(mesh_theta, ax=axs[1], orientation='vertical')
+    cbar.set_label('K', fontsize=20)
+    axs[1].set_ylabel("Height [m]", fontsize=20)
+    axs[1].set_xlabel("Time", fontsize=20)
+    
+    plt.savefig(
+        os.path.join(
+            path_paper_plots, "q_theta_v_check.png"
+        ),
+    )
+    return(ds)
+
+
+
+
+        
+def plot_w_subfigure(ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, path_paper_plots, fig_name):
      
     fig, axes = plt.subplots(1, 2, constrained_layout=True)
 
@@ -178,7 +300,7 @@ def plot_w_subfigure(ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, path_
     
     plt.savefig(
         os.path.join(
-            path_paper_plots, "w_subcloud_lcl.png"
+            path_paper_plots, fig_name+".png"
         ),
     )
      
@@ -256,92 +378,6 @@ def calc_percentiles(ds, percentiles=[25, 50, 75]):
         
     return(q)
     
-    
-def f_calcThermodynamics(P,Q,T, LTS, time, height, Hsurf, date):
-    """ 
-    author: claudia Acquistapace
-    date; 25 July 2019 (heat wave in Cologne)
-    contact: cacquist@meteo.uni-koeln.de
-    goal: derive thermodinamic quantities of interest for the analysis: 
-     output: dictionary containing the following variables: 
-                    'mixingRatio':r, 
-                    'relativeHumidity':rh, 
-                    'virtualTemperature':tv,
-                    'cclHeight':result_ccl['z_ccl'],
-                    'cclTemperature':result_ccl['T_ccl'],
-                    'lclHeight':lclArray,
-                    'surfaceTemperature':TSurf, 
-                    'virtualPotentialTemperature':Theta_v,
-                    'time':time, 
-                    'height':height,
-                    'LTS':LTS,
-     input:         matrices of Pressure (pa), 
-                    temperature (K), 
-                    absolute humidity (Kg/Kg), 
-                    time, 
-                    height, 
-                    height of the surface
-    """
-    r  = np.zeros((len(time), len(height)))
-    rh = np.zeros((len(time), len(height)))
-    tv = np.zeros((len(time), len(height)))
-        
-    # calculation of mixing ratio and relative humidity
-    T0 = 273.15
-    for iTime in range(len(time)):
-        for iHeight in range(len(height)):
-            r[iTime,iHeight]  = (Q[iTime, iHeight])/(1-Q[iTime, iHeight])
-            rh[iTime,iHeight] = 0.263*P[iTime, iHeight] * \
-            Q[iTime, iHeight] * (np.exp( 17.67 * (T[iTime, iHeight]-T0) / (T[iTime, iHeight] - 29.65)))**(-1)
-
-    #print('RH', rh[0,0], rh[0,-1])
-    #print('pressure ' , P[0,0]*0.001, P[0,-1]*0.001)
-    #print('temp', T[0,0], T[0,-1])
-
-
-    # calculation of virtual temperature
-    for indH in range(len(height)-1, 0, -1):
-        tv[:,indH] = T[:,indH]*(1+0.608 * Q[:,indH])
-            
-        
-    indSurf = len(height)-1
-    PSurf    = P[:,indSurf]
-    TSurf    = T[:,indSurf]         # T in K
-    rhSurf   = rh[:,indSurf-1]
-    lclArray = []
-
-    for iTime in range(len(time)):
-        lclArray.append(lcl(PSurf[iTime],TSurf[iTime],rhSurf[iTime]/100.))
-    
-    # calculation of potential and virtual potential temperature (P in pascal)
-    Rd = 287.058  # gas constant for dry air [Kg-1 K-1 J]
-    Cp = 1004.
-    Theta = np.zeros((len(time), len(height)))
-    Theta_v = np.zeros((len(time), len(height)))
-    for indTime in range(len(time)):
-        for indHeight in range(len(height)):
-            k_val = Rd*(1-0.23*r[indTime, indHeight])/Cp
-            Theta_v[indTime, indHeight] = ( (1 + 0.61 * r[indTime, indHeight]) * \
-                   T[indTime, indHeight] * (100000./P[indTime, indHeight])**k_val)
-            Theta[indTime, indHeight]   = T[indTime, indHeight] * (100000./P[indTime, indHeight])**k_val
-    
-    
-    ThermodynPar={'mixingRatio':r, 
-                  'relativeHumidity':rh, 
-                  'virtualTemperature':tv,
-                  'cclHeight':result_ccl['z_ccl'],
-                  'cclTemperature':result_ccl['T_ground_ccl'],
-                  'lclHeight':lclArray,
-                  'surfaceTemperature':TSurf, 
-                  'virtualPotentialTemperature':Theta_v,
-                  'potentialTemperature':Theta,
-                  'time':time, 
-                  'height':height,
-                  'LTS':LTS,
-                  }
-    
-    return(ThermodynPar)
-
 
 
 def plot_figure(lcl_dc, dct_vw_q):
