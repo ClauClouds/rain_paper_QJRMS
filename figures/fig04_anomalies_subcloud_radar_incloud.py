@@ -9,7 +9,7 @@ subplots:
 2) second row: 3 subpanel with anomalies of vertical velocity, specific humidity and virtual pot temp
 3) third row: 2 subpanels with vd vz Ze and sk vs Ze
 """
-from readers.ship import read_ship_pressure
+from readers.ship import read_and_save_P_file
 from readers.lidars import read_anomalies
 from readers.cloudtypes import read_cloud_class, read_rain_ground
 from cloudtypes.path_folders import path_diurnal_cycle_arthus, path_paper_plots
@@ -45,32 +45,35 @@ def main():
     
     # second row of plots: derive specific humidity and virtual potential temperature from lidar data
     ds_therm = calc_thermo_prop()
-    ds_therm = xr.align(ds_therm, ds_ct, ds_cp, join="inner")
     
+    ds_therm, ds_cp = xr.align(ds_therm, ds_cp, join="inner")
+    print('ds_therm', ds_therm)
+
+    ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec = assign_flags(ds_therm, ds_cp)
+    
+    # call prep function for regrid and select for q and thetav
+    #ds_q_sl, ds_q_cg, ds_q_sl_prec, ds_q_sl_nonprec, ds_q_cg_prec, ds_q_cg_nonprec = prepare_therm_profiles(ds_therm, ds_cp, 'q')
+    #ds_thetav_sl, ds_thetav_cg, ds_thetav_sl_prec, ds_thetav_sl_nonprec, ds_thetav_cg_prec, ds_thetav_cg_nonprec = prepare_therm_profiles(ds_therm, ds_cp, 'theta_v')
+    check_plot_mean_profs(ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, 'q', path_paper_plots, 'q_profiles')
+    
+    #plot_w_subfigure(ds_theta_v_sl_prec, ds_theta_v_sl_nonprec, ds_theta_v_cg_prec, ds_theta_v_cg_nonprec, path_paper_plots, 'theta_v_profiles')
+
+    #plot_w_subfigure(ds_q_sl_prec, ds_q_sl_nonprec, ds_q_cg_prec, ds_q_cg_nonprec, path_paper_plots, 'q_profiles')
     # regrid heights with respect to lcl
-    ds_therm_lcl = calc_lcl_grid_no_dc(ds_therm, lcl_ds, ds_class, height_var, time_var, var_name)
     #plot_q_theta_check(ds_therm, path_paper_plots)
 
-    # align cloud type flags and rain ground flag
-    ds_therm_sl, ds_therm_cg, ds_therm_sl_prec, ds_therm_sl_nonprec, ds_therm_cg_prec, ds_therm_cg_nonprec = assign_flags_to_profiles(ds_therm, ds_cp, ds_r)
-
-    
+    strasuka
     # second row of plots: read lidar data
     
-    # prepare data (calculate mean and std of the profiles for shallow/congestus in prec and non prec)
+    # prepare data (calculate mean and std of the anomaly profiles for shallow/congestus in prec and non prec)
     ds_sl, ds_cg, ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec = prepare_anomaly_profiles(ds_cp, "VW", lcl_dc)
     
     plot_w_subfigure(ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, path_paper_plots, 'w_subcloud_lcl')
     
-    plot_w_subfigure(ds_therm_sl_prec, ds_therm_sl_nonprec, ds_therm_cg_prec, ds_therm_cg_nonprec, path_paper_plots, 'therm_subcloud_lcl')
 
     
     
-    #plot_figure(lcl_dc, dct_vw_q)
-def assign_flags_to_profiles(ds_therm, ds_cp, ds_r):
-    
-    # align cloud type flags and rain ground flag
-    ds_therm, ds_cp, ds_r = xr.align(ds_therm, ds_cp, ds_r, join="inner")
+def assign_flags(ds, ds_cp):
     
     # selecting cloud types and rain/norain conditions
     is_shallow = ds_cp.shape == 0
@@ -86,13 +89,50 @@ def assign_flags_to_profiles(ds_therm, ds_cp, ds_r):
     is_sl_non_prec = is_shallow & ~is_prec_ground 
 
     # segregating with respect to shallow and deep clouds
-    ds_sl_prec = ds_therm.isel(time=is_sl_prec)
-    ds_sl_nonprec = ds_therm.isel(time=is_sl_non_prec)
-    ds_cg_prec = ds_therm.isel(time=is_cg_prec)
-    ds_cg_nonprec = ds_therm.isel(time=is_cg_non_prec)
+    ds_sl_prec = ds.isel(time=is_sl_prec)
+    ds_sl_nonprec = ds.isel(time=is_sl_non_prec)
+    ds_cg_prec = ds.isel(time=is_cg_prec)
+    ds_cg_nonprec = ds.isel(time=is_cg_non_prec)
     
-    ds_sl = ds_therm.isel(time=is_shallow)
-    ds_cg = ds_therm.isel(time=is_congestus)
+    return ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec
+    
+def prepare_therm_profiles(ds_therm, ds_cp, var_name):
+    
+    
+    # interpolate classification of clouds over time stamps of thermodynamic profiles
+    class_interp = ds_cp.interp(time=ds_therm.time.values, method='nearest')                                                           
+                                                                    
+    # read lcl and interpolate on ds thermodynamic profiles dataset
+    ds_lcl = read_lcl()
+    ds_lcl_interp = ds_lcl.interp(time=ds_therm.time.values, method='nearest')
+    
+    # align lcl dataset to the y dataset of the anomalies with flags
+    ds_lcl, ds_therm, ds_class = xr.align(ds_lcl_interp, ds_therm, class_interp, join="inner")
+
+    # regridding data to height grid referred to lcl
+    ds_therm_h_lcl = calc_lcl_grid_no_dc(ds_therm, ds_lcl, ds_class, 'height', 'time', var_name)
+
+    # selecting cloud types and rain/norain conditions
+    is_shallow = ds_cp.shape == 0
+    is_congestus = ds_cp.shape == 1
+
+    # selecting prec and non prec
+    is_prec_ground = ds_cp.flag_rain_ground == 1
+    
+    # defining classes 
+    is_cg_prec = is_congestus & is_prec_ground
+    is_cg_non_prec = is_congestus & ~is_prec_ground 
+    is_sl_prec = is_shallow & is_prec_ground
+    is_sl_non_prec = is_shallow & ~is_prec_ground 
+
+    # segregating with respect to shallow and deep clouds
+    ds_sl_prec = ds_therm_h_lcl.isel(time=is_sl_prec)
+    ds_sl_nonprec = ds_therm_h_lcl.isel(time=is_sl_non_prec)
+    ds_cg_prec = ds_therm_h_lcl.isel(time=is_cg_prec)
+    ds_cg_nonprec = ds_therm_h_lcl.isel(time=is_cg_non_prec)
+    
+    ds_sl = ds_therm_h_lcl.isel(time=is_shallow)
+    ds_cg = ds_therm_h_lcl.isel(time=is_congestus)
     
     return ds_sl, ds_cg, ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec
 
@@ -153,7 +193,12 @@ def calc_thermo_prop():
     print('shape of TV', np.shape(Tv_data))
 
     # reading surface pressure from ship data re-sampled
-    ship_data = read_ship_pressure()
+    if os.path.exists('/data/obs/campaigns/eurec4a/msm/ship_data/ship_dataset_P.nc'):
+        ship_data = xr.open_dataset('/data/obs/campaigns/eurec4a/msm/ship_data/ship_dataset_P.nc')
+    else:
+        ship_data = read_and_save_P_file()
+            
+    # interpolate on time resolution of the thermodynamic profiles
     ship_arthus = ship_data.interp(time=ds_arthus.time.values, method='nearest')
     P_surf = ship_arthus.P.values
 
@@ -201,11 +246,86 @@ def calc_thermo_prop():
     ds_out.q.attrs["units"] = "g/kg"
     ds_out.theta_v.attrs["units"] = "K"
     
-    print(ds_out)
+    
+
     return(ds_out)
 
 
+def check_plot_mean_profs(ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, var_name, path_paper_plots, fig_name):
+    
+    
+    fig, axes = plt.subplots(1, 2, figsize=(15, 5), constrained_layout=True)
+    
+    axes[0].annotate(
+        "a) specific humidity",
+        xy=(0, 1),
+        xycoords="axes fraction",
+        ha="left",
+        va="bottom",
+    )
+    
+    axes[1].annotate(
+        "b) virtual potential temperature",
+        xy=(0, 1),
+        xycoords="axes fraction",
+        ha="left",
+        va="bottom",
+    ) 
+    
+    axes[0].plot(ds_sl_nonprec.q.mean("time"),
+                 ds_sl_nonprec.height,
+                 label='shallow non prec',
+                 color=COLOR_SHALLOW)
+    axes[0].plot(ds_cg_nonprec.q.mean("time"),
+                 ds_cg_nonprec.height,
+                 label='congestus non prec',
+                color=COLOR_CONGESTUS)
+    axes[0].plot(ds_sl_prec.q.mean("time"), 
+                 ds_sl_prec.height,
+                 label='shallow prec',
+                 color=COLOR_SHALLOW, linestyle=':')
+    axes[0].plot(ds_cg_prec.q.mean("time"),
+                 ds_cg_prec.height,
+                 label='congestus prec',
+                 color=COLOR_CONGESTUS, linestyle=':')
+    
+    axes[0].legend(frameon=False, fontsize=11, loc='upper right')
 
+    axes[1].plot(ds_sl_nonprec.theta_v.mean("time"),
+                 ds_sl_nonprec.height,
+                 label='shallow non prec',
+                 color=COLOR_SHALLOW)
+    axes[1].plot(ds_cg_nonprec.theta_v.mean("time"),
+                 ds_cg_nonprec.height,
+                 label='congestus non prec',
+                color=COLOR_CONGESTUS)
+    axes[1].plot(ds_sl_prec.theta_v.mean("time"), 
+                 ds_sl_prec.height,
+                 label='shallow prec',
+                 color=COLOR_SHALLOW, linestyle=':')
+    axes[1].plot(ds_cg_prec.theta_v.mean("time"),
+                 ds_cg_prec.height,
+                 label='congestus prec',
+                 color=COLOR_CONGESTUS, linestyle=':')
+    
+    axes[1].legend(frameon=False, fontsize=11, loc='upper right')
+    axes[0].set_ylabel("Height [m]", fontsize=20)
+    axes[0].set_xlabel("q anomaly [g/kg]", fontsize=20)
+    axes[0].set_yticks(np.arange(0, 2000, 500), minor=True)
+    axes[0].set_ylim([0, 10000])
+    axes[0].set_xlim([0, 16])
+    axes[1].set_xlim([0, 305])
+    axes[1].set_ylabel("Height [m]", fontsize=20)
+    axes[1].set_xlabel("theta_v anomaly [K]", fontsize=20)
+    axes[1].set_yticks(np.arange(0, 2000, 500), minor=True)
+    axes[1].set_ylim([0, 10000])
+    
+    plt.savefig(
+        os.path.join(
+            path_paper_plots, "q_thetav_normal_height.png",
+        ),
+    )
+    
 def plot_q_theta_check(ds, path_paper_plots):
     
     print(ds)
@@ -260,7 +380,7 @@ def plot_w_subfigure(ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, path_
     fig, axes = plt.subplots(1, 2, constrained_layout=True)
 
     axes[0].annotate(
-        "a) vertical wind anomaly",
+        "a) ",
         xy=(0, 1),
         xycoords="axes fraction",
         ha="left",
@@ -285,7 +405,7 @@ def plot_w_subfigure(ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, path_
     
     axes[0].legend(frameon=False, fontsize=11, loc='lower left')
     axes[0].set_ylabel("Height above\nLCL [km]", fontsize=20)
-    axes[0].set_xlabel("w anomaly [m/s]", fontsize=20)
+    #axes[0].set_xlabel("w anomaly [m/s]", fontsize=20)
     axes[0].set_yticks(np.arange(-1, 1, 0.5), minor=True)
     axes[0].set_yticklabels([-1, -0.5, "LCL", 0.5, 1, 1.5], fontsize=20)
     axes[0].set_ylim(
@@ -429,22 +549,12 @@ def calc_lcl_grid_no_dc(ds, lcl_ds, ds_class, height_var, time_var, var_name):
     # positive shift means each height bin is shifted downward
     rows, columns = np.ogrid[: da_var.shape[0], : da_var.shape[1]]  # 2d indices
     shift = ((da_lcl + dz / 2) // dz).values.astype("int16") # numnber of bins to shift
-    print('Shape of rows:', rows.shape)
-    print('Shape of columns:', columns.shape)
-    print('Shape of shift:', shift.shape)
-    print(shift[0:30])
-    print(columns[0,0:10])
     
     # reindexing columns with the shift
     columns = columns + shift[:, np.newaxis]
-    print(columns[0,0:10])
-    print(columns[6,0:10])
 
     # set limit to upper bound
     columns[columns >= columns.shape[1]] = columns.shape[1] - 1  # upper bound
-    print('shape of columns', np.shape(columns))
-    print('shape of da_var.values', np.shape(da_var.values))
-
 
     # reading values corresponding to the new indeces
     da_var[:] = da_var.values[rows, columns]

@@ -40,6 +40,7 @@ def read_and_save_P_file():
     _, index = np.unique(ship_data['time'], return_index=True)
     ship_data = ship_data.isel(time=index)
     ship_data.to_netcdf('/data/obs/campaigns/eurec4a/msm/ship_data/ship_dataset_P.nc')
+    return ship_data
 
 def read_ship_pressure():
     """
