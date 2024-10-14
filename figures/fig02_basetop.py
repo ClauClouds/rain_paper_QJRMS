@@ -9,7 +9,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 from mpl_style import CMAP
 
 # add parent directory to path
@@ -17,9 +17,11 @@ sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 )
 
-from fig04_diurnal import prepare_data
+from fig03_diurnal_all import prepare_data
 
-load_dotenv()
+from readers.cloudtypes import read_cloud_class, read_rain_flags
+from readers.radar import read_lwp
+#load_dotenv()#
 
 
 def main():
@@ -31,8 +33,117 @@ def main():
 
     da_hist = statistics(ds)
 
-    plot_histogram(da_hist=da_hist)
 
+    # read MWR data
+    merian = read_lwp() 
+
+    # read rain flags
+    rainflags = read_rain_flags()
+    
+    #derive flags:
+    combiprecipflag = (rainflags.flag_rain_ground.values == 1) | (rainflags.flag_rain.values == 1) #either ground_rain or rain
+    cloudyflag = ((rainflags.flag_rain_ground.values == 0) & (rainflags.flag_rain.values == 0)) #everything thats cloudy in ground_rain and rain
+
+    # read cloud classification
+    cloudclassdata = read_cloud_class()
+    
+    # interpolate classification on LWP time stamps and derive flags for shallow/congestus data
+    cloudclassdataip = cloudclassdata.interp(time=merian.time)
+    shallow = (cloudclassdataip.shape.values == 0) & (cloudyflag == 1)
+    congestus = (cloudclassdataip.shape.values == 1) &(cloudyflag == 1)
+    
+    # plot figure
+    #plot_histogram(da_hist=da_hist)
+    plot_figure2(da_hist, merian, shallow, congestus, cloudyflag)
+    
+def plot_figure2(da_hist, merian, shallow, congestus, cloudyflag):
+    
+    # deriving cumulative histogram of cloudy, non-precipitating LWP as function of shallow/congestus
+    binss = np.arange(-50,1000,1)
+    bins=np.array([np.mean([binss[i],binss[i+1]]) for i in range(len(binss)-1)])
+
+    # selecting indeces of shallow/congestus 
+    indexinds = (cloudyflag == 1) & (~np.isnan(merian.lwp))
+    
+    
+    
+    # constructing figure 2
+    fig, ax = plt.subplots(1, 2, figsize=(12, 4))
+
+    ax[0].set_title("a) Joint histogram of cloud base\n and cloud top height", loc='left', fontweight='black')
+    
+    im = ax[0].pcolormesh(
+        da_hist.radar_cloud_base * 1e-3,
+        da_hist.radar_cloud_top * 1e-3,
+        da_hist,
+        cmap=CMAP,
+        norm=mcolors.LogNorm(vmin=1, vmax=30000),
+        shading="nearest",
+    )
+    
+    fig.colorbar(im, ax=ax[0], label="Count")
+
+    # set equal aspect ratio
+    ax[0].set_aspect("equal")
+
+    ax[0].set_xlim(-1, 4)
+    ax[0].set_ylim(-1, 4)
+
+    ax[0].set_yticks(np.arange(-1, 5, 1))
+    ax[0].set_yticklabels([-1, "LCL", 1, 2, 3, 4])
+
+    ax[0].set_xticks(np.arange(-1, 5, 1))
+    ax[0].set_xticklabels([-1, "LCL", 1, 2, 3, 4])
+
+    # indicate dotted line for LCL height
+    ax[0].axhline(0, color="k", linestyle="--", linewidth=1)
+    ax[0].axvline(0, color="k", linestyle="--", linewidth=1)
+    ax[0].axhline(0.6, color="k", linestyle=":", linewidth=1)
+
+    ax[0].annotate(
+        "LCL + 600 m",
+        xy=(4, 0.6),
+        xycoords="data",
+        ha="right",
+        va="bottom",
+    )
+
+    ax[0].plot([-1, 5], [-1, 5], color="k", linewidth=1)
+
+    ax[0].set_xlabel("Cloud base height above LCL [km]")
+    ax[0].set_ylabel("Cloud top height above LCL [km]")
+    
+    # second plot: cumulative distributions LWP
+    ax[1].set_title("b) Cumulative distributions of LWP", loc='left', fontweight='black')
+
+    hist=ax[1].hist(merian.lwp[shallow & indexinds],
+                     bins=binss, 
+                     histtype='step', 
+                     color='#ff9500',
+                     label='shallow',
+                     density=True,
+                     cumulative=True, 
+                     linewidth=2)
+    hist=ax[1].hist(merian.lwp[congestus & indexinds],
+                     bins=binss, 
+                     histtype='step', 
+                     color='#008080',
+                     label='deep',
+                     density=True,
+                     cumulative=True, 
+                     linewidth=2)
+    ax[1].legend(frameon=False,loc=4)
+    #ax.set_yscale('log')
+    #ax.set_xscale('log')
+    ax[1].set_xlabel('LWP / gm$^{-2}$')
+    ax[1].set_xlim(0,550)
+    ax[1].set_ylim(0.3,1)
+    ax[1].set_ylabel('Cumulated density / g$^{-1}$m$^{2}$')
+    
+
+    plt.savefig(
+        os.path.join("/net/ostro/plots_rain_paper/", "figure02.png")
+    )
 
 def statistics(ds):
     """
