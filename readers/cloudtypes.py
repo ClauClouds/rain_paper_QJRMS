@@ -7,6 +7,27 @@ import os
 import pandas as pd
 import xarray as xr
 
+def read_cloud_base():
+    """
+    read cloud base and returns ds for the entire campaign
+    """
+
+    ds = xr.open_dataset(
+        os.path.join(
+            "/data/obs/campaigns/eurec4a/msm/",
+            "cloud_class_prop_flags.nc"), 
+            drop_variables = ['flag_cloud_base_source', 
+                         'flag_rain', 
+                         'flag_rain_ground',
+                         'virga_depth',
+                         'cloud_top_height',
+                         'cloud_geometrical_thickness', 
+                         'precip', 
+                         'shape']
+
+    )
+
+    return ds
 
 def read_rain_flags():
     """
