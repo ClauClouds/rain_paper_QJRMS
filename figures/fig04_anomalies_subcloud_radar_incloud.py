@@ -13,7 +13,7 @@ from readers.ship import read_and_save_P_file
 from readers.lidars import read_anomalies
 from readers.radar import read_lwp
 
-from readers.cloudtypes import read_cloud_class, read_rain_ground, read_cloud_base, read_in_clouds_radar_moments,
+from readers.cloudtypes import read_cloud_class, read_rain_ground, read_cloud_base, read_in_clouds_radar_moments
 from cloudtypes.path_folders import path_diurnal_cycle_arthus, path_paper_plots
 from readers.lcl import read_lcl, read_diurnal_cycle_lcl
 from datetime import datetime
@@ -56,8 +56,8 @@ def main():
     # split datasets in q and theta_v
     ds_q, ds_theta_v = split_dataset(ds_therm)
     
-    ds_q_sl_prec, ds_q_sl_nonprec, ds_q_cg_prec, ds_q_cg_nonprec = prepare_therm_profiles(ds_q, ds_cp, 'q')
-    ds_theta_v_sl_prec, ds_theta_v_sl_nonprec, ds_theta_v_cg_prec, ds_theta_v_cg_nonprec = prepare_therm_profiles(ds_theta_v, ds_cp, 'theta_v')
+    ds_q_sl_prec, ds_q_sl_nonprec, ds_q_cg_prec, ds_q_cg_nonprec, ds_q_clear = prepare_therm_profiles(ds_q, ds_cp, 'q')
+    ds_theta_v_sl_prec, ds_theta_v_sl_nonprec, ds_theta_v_cg_prec, ds_theta_v_cg_nonprec, ds_theta_v_clear = prepare_therm_profiles(ds_theta_v, ds_cp, 'theta_v')
     
     # prepare data (calculate mean and std of the anomaly profiles for shallow/congestus in prec and non prec)
     ds_sl, ds_cg, ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec = prepare_anomaly_profiles(ds_cp, "VW", lcl_dc)
@@ -79,14 +79,16 @@ def main():
                            ds_q_sl_prec, 
                            ds_q_sl_nonprec, 
                            ds_q_cg_prec, 
-                           ds_q_cg_nonprec, 
+                           ds_q_cg_nonprec,
+                           ds_q_clear,  
                            ds_theta_v_sl_prec, 
-                            ds_theta_v_sl_nonprec, 
-                            ds_theta_v_cg_prec, 
-                            ds_theta_v_cg_nonprec, 
-                            ds_cb_sllcl, 
-                            ds_cb_cglcl, 
-                            data)
+                           ds_theta_v_sl_nonprec, 
+                           ds_theta_v_cg_prec, 
+                           ds_theta_v_cg_nonprec, 
+                           ds_theta_v_clear, 
+                           ds_cb_sllcl, 
+                           ds_cb_cglcl,
+                           data)
 
     
     
@@ -99,11 +101,13 @@ def plot_multipanel_figure(lcl_dc,
                            ds_q_sl_prec, 
                            ds_q_sl_nonprec, 
                            ds_q_cg_prec, 
-                           ds_q_cg_nonprec, 
+                           ds_q_cg_nonprec,
+                           ds_q_clear, 
                             ds_theta_v_sl_prec, 
                             ds_theta_v_sl_nonprec, 
                             ds_theta_v_cg_prec, 
-                            ds_theta_v_cg_nonprec, 
+                            ds_theta_v_cg_nonprec,
+                            ds_theta_v_clear, 
                             ds_cb_sllcl,
                             ds_cb_cglcl,
                             data):
@@ -164,7 +168,7 @@ def plot_multipanel_figure(lcl_dc,
     
     # lcl diurnal cycle
     ax0 = fig.add_subplot(gs[0, :])  # First row, spans all columns
-    ax0.plot(lcl_dc.time.values, lcl_dc.lcl_dc.values, linewidth=2, color='black')
+    ax0.plot(lcl_dc.time.values, lcl_dc.lcl_dc.values, linewidth=3, color='black')
     ax0.set_title(' a) LCL diurnal cycle', loc='left')
     ax0.set_ylabel('Height [m]')
     ax0.set_xlabel('Time [hh:mm] (Local time)')
@@ -190,7 +194,7 @@ def plot_multipanel_figure(lcl_dc,
                   ds_cg_prec,
                   ds_cg_nonprec,
                   -1, 1, 'w [m/s]')
-    ax2.set_title('c) Profiles of vertical velocity', loc='left')
+    ax2.set_title('c) Anomalies of vertical velocity', loc='left')
 
 
     # profiles of q
@@ -201,7 +205,14 @@ def plot_multipanel_figure(lcl_dc,
                   ds_q_cg_prec, 
                   ds_q_cg_nonprec, 
                   10, 16.5, 'q [g/kg]')
-    ax3.set_title('d) Profiles of specific humidity', loc='left')
+    ax3.plot(ds_q_clear.mean("time"),
+             ds_q_clear.height* 1e-3,
+             label='clear sky',
+             color='black', 
+             linewidth=3, 
+             linestyle = 'dashdot')
+
+    ax3.set_title('d) Specific humidity', loc='left')
 
  
     # profiles of theta_v
@@ -212,12 +223,19 @@ def plot_multipanel_figure(lcl_dc,
                   ds_theta_v_cg_prec, 
                   ds_theta_v_cg_nonprec, 
                   300, 315, '$\Theta_v$[K]')
-    ax4.set_title('e) Profiles of $\Theta_v$', loc='left')
-             
+    ax4.plot(ds_theta_v_clear.mean("time"),
+             ds_theta_v_clear.height* 1e-3,
+             label='clear sky',
+             color='black', 
+             linewidth=3, 
+             linestyle = 'dashdot')
+    ax4.set_title('e) $\Theta_v$', loc='left')
+    ax4.legend(frameon=False, loc='lower right')
+            
     # scatter Ze vs Vd
 
     ax5 = fig.add_subplot(gs[2, 0:2])  # Third row, left plot
-    ax5.set_title('f) Norm Occ. of Ze vs Vd', loc='left')
+    ax5.set_title('f) Normalized Occurrences of Ze vs Vd', loc='left')
 
     hist_d = ax5.hist2d(ze_c, 
                         vd_c, 
@@ -247,7 +265,7 @@ def plot_multipanel_figure(lcl_dc,
     # scatter Ze vs Sk
 
     ax6 = fig.add_subplot(gs[2, 2:])  # Third row, right plot
-    ax6.set_title('g) Norm Occ. of Ze vs Sk', loc='left')
+    ax6.set_title('g) Normalized Occurrences of Ze vs Sk', loc='left')
 
     hist_d = ax6.hist2d(ze_c, 
                         -sk_c, 
@@ -320,34 +338,31 @@ def plot_profiles(ax, ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, vmin
                  ds_sl_nonprec.height* 1e-3,
                  label='shallow non prec',
                  color=COLOR_SHALLOW, 
-                 linewidth=2)
+                 linewidth=3)
     ax.plot(ds_cg_nonprec.mean("time"),
                  ds_cg_nonprec.height* 1e-3,
                  label='congestus non prec',
                 color=COLOR_CONGESTUS, 
-                linewidth=2)
+                linewidth=3)
 
     ax.plot(ds_sl_prec.mean("time"), 
                  ds_sl_prec.height* 1e-3,
                  label='shallow prec',
                  color=COLOR_SHALLOW, 
                  linestyle=':', 
-                linewidth=2)
+                linewidth=3)
 
     ax.plot(ds_cg_prec.mean("time"),
                  ds_cg_prec.height* 1e-3,
                  label='congestus prec',
                  color=COLOR_CONGESTUS, 
                  linestyle=':', 
-                linewidth=2)
+                linewidth=3)
 
     ax.set_xlabel(var_name)
     ax.set_ylim(-0.5, 1.5)
     ax.set_xlim([vmin, vmax])
-    
-    if var_name == 'theta_v [K]':
-        ax.legend(frameon=False, loc='lower right')
-        
+            
     #ax.set_yticks(np.arange(-1, 1, 0.5), minor=True)
     ax.set_yticks(np.arange(-0.5, 1.5, 0.25), minor=True)
     ax.set_yticklabels([])
@@ -486,6 +501,7 @@ def prepare_therm_profiles(ds, ds_cp, var_string):
     # selecting cloud types and rain/norain conditions
     is_shallow = class_interp.shape == 0
     is_congestus = class_interp.shape == 1
+    is_clear = class_interp.shape == -1
 
     # selecting prec and non prec
     is_prec_ground = class_interp.flag_rain_ground == 1
@@ -501,8 +517,9 @@ def prepare_therm_profiles(ds, ds_cp, var_string):
     ds_sl_nonprec = ds_therm_lcl.isel(time=is_sl_non_prec)
     ds_cg_prec = ds_therm_lcl.isel(time=is_cg_prec)
     ds_cg_nonprec = ds_therm_lcl.isel(time=is_cg_non_prec)
+    ds_clear = ds_therm_lcl.isel(time=is_clear)
     
-    return ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec
+    return ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, ds_clear
     
 
 

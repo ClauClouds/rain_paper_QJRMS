@@ -168,8 +168,7 @@ def calc_lcl_grid(ds, lcl_ds, height_var, time_var, var_name):
     columns = columns + shift[:, np.newaxis]
     columns[columns >= columns.shape[1]] = columns.shape[1] - 1  # upper bound
     da_var[:] = da_var.values[rows, columns]
-    print(da_var)
-    strasuka
+
     return(da_var)
 
 
@@ -329,6 +328,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         va="bottom",
         ha="left",
         fontsize=25,
+        fontweight='black'
     )
     axes[1,0].annotate(
         "b) Congestus hydrometeor fraction (#{:,})".format(occ_co.values),
@@ -337,7 +337,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         va="bottom",
         ha="left",
         fontsize=25,
-
+        fontweight='black'
     )
     
     axes[2,0].annotate(
@@ -347,6 +347,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         va="bottom",
         ha="left",
         fontsize=25,
+        fontweight='black'
     )
     
     axes[3,0].annotate(
@@ -356,6 +357,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         va="bottom",
         ha="left",
         fontsize=25,
+        fontweight='black'
     )
 
     axes[4,0].annotate(
@@ -365,6 +367,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         va="bottom",
         ha="left",
         fontsize=25,
+        fontweight='black'
     )
 
     kwargs = dict(shading="nearest", cmap=CMAP, norm=norm)
@@ -490,6 +493,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         va="bottom",
         ha="left",
         fontsize=25,
+        fontweight='black'
     )
     axes[1,1].annotate(
         "g) Water vapor mixing ratio ",
@@ -498,6 +502,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         va="bottom",
         ha="left",
         fontsize=25,
+        fontweight='black'
     )
     
     axes[2,1].annotate(
@@ -507,6 +512,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         va="bottom",
         ha="left",
         fontsize=25,
+        fontweight='black'
     )
     
     axes[3,1].annotate(
@@ -516,6 +522,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         va="bottom",
         ha="left",
         fontsize=25,
+        fontweight='black'
     )
 
     axes[4,1].annotate(
@@ -525,6 +532,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         va="bottom",
         ha="left",
         fontsize=25,
+        fontweight='black'
     )
     
     cbar_hf = fig.colorbar(
