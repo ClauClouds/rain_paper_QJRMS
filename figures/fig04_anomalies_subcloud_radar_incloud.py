@@ -13,7 +13,7 @@ from readers.ship import read_and_save_P_file
 from readers.lidars import read_anomalies
 from readers.radar import read_lwp
 
-6from readers.cloudtypes import read_cloud_class, read_rain_ground, read_cloud_base, read_in_clouds_radar_moments
+from readers.cloudtypes import read_cloud_class, read_rain_ground, read_cloud_base, read_in_clouds_radar_moments
 from cloudtypes.path_folders import path_diurnal_cycle_arthus, path_paper_plots
 from readers.lcl import read_lcl, read_diurnal_cycle_lcl
 from datetime import datetime
@@ -22,13 +22,17 @@ import sys
 import pandas as pd
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+
 import numpy as np
 import xarray as xr
 #from dotenv import load_dotenv
 from mpl_style import CMAP, COLOR_CONGESTUS, COLOR_SHALLOW
 import matplotlib.dates as mdates
 import matplotlib.ticker as ticker
-
+import metpy.calc as mpcalc
+from metpy.units import units
+import pdb
 from dask.diagnostics import ProgressBar
 ProgressBar().register()
 
@@ -54,11 +58,26 @@ def main():
     ds_therm = calc_thermo_prop()
     
     # split datasets in q and theta_v
-    ds_q, ds_theta_v = split_dataset(ds_therm)
+    ds_q, ds_theta_v, ds_td, ds_theta_e = split_dataset(ds_therm)
     
     ds_q_sl_prec, ds_q_sl_nonprec, ds_q_cg_prec, ds_q_cg_nonprec, ds_q_clear = prepare_therm_profiles(ds_q, ds_cp, 'q')
     ds_theta_v_sl_prec, ds_theta_v_sl_nonprec, ds_theta_v_cg_prec, ds_theta_v_cg_nonprec, ds_theta_v_clear = prepare_therm_profiles(ds_theta_v, ds_cp, 'theta_v')
+    #ds_theta_e_sl_prec, ds_theta_e_sl_nonprec, ds_theta_e_cg_prec, ds_theta_e_cg_nonprec, ds_theta_e_clear = prepare_therm_profiles(ds_theta_e, ds_cp, 'theta_e')
     
+    # scatter plot of q and theta_e for each class    
+    #plot_scatter_q_theta_e(ds_q_sl_prec,
+    #                       ds_q_sl_nonprec,
+    #                       ds_q_cg_prec,
+    #                       ds_q_cg_nonprec,
+    #                       ds_theta_e_sl_prec,
+    #                       ds_theta_e_sl_nonprec,
+    #                       ds_theta_e_cg_prec,
+    #                       ds_theta_e_cg_nonprec)
+    
+    # prepare data for horizontal wind speed ()
+    ds_sl_hw, ds_sl_prec_hw, ds_sl_nonprec_hw, ds_cg_hw, ds_cg_prec_hw, ds_cg_nonprec_hw = prepare_anomaly_profiles(ds_cp, "H_wind_speed", lcl_dc)
+    
+
     # prepare data (calculate mean and std of the anomaly profiles for shallow/congestus in prec and non prec)
     ds_sl, ds_cg, ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec = prepare_anomaly_profiles(ds_cp, "VW", lcl_dc)
     
@@ -88,10 +107,149 @@ def main():
                            ds_theta_v_clear, 
                            ds_cb_sllcl, 
                            ds_cb_cglcl,
+                           ds_sl_prec_hw,
+                           ds_sl_nonprec_hw,
+                           ds_cg_prec_hw,
+                           ds_cg_nonprec_hw,
                            data)
+    
 
+
+def plot_scatter_q_theta_e(ds_q_sl_prec,
+                           ds_q_sl_nonprec,
+                           ds_q_cg_prec,
+                           ds_q_cg_nonprec,
+                           ds_theta_e_sl_prec,
+                           ds_theta_e_sl_nonprec,
+                           ds_theta_e_cg_prec,
+                           ds_theta_e_cg_nonprec):
+    
+    # plot scatter plot of q vs theta_e for each class
+    fig = plt.figure(figsize=(10, 10))
+    
+    # set colorbar with height
+    # define colorbars for sounding 1 and sounding 2
+    cmap = mpl.cm.get_cmap('viridis')
+    norm = mpl.colors.Normalize(vmin=-0.5, vmax=3.0)
+    cmap.set_under('white')
+    
+    # 4 subplots
+    ax1 = fig.add_subplot(221)
+    plot_scatter(ax1, 
+                 ds_q_sl_prec, 
+                 ds_theta_e_sl_prec, 
+                 'q [g/kg]', 
+                 '$\Theta_e$ [K]', 
+                 'shallow prec', 
+                 cmap, 
+                 norm)
+    
+    # add second subplot
+    ax2 = fig.add_subplot(222)
+    plot_scatter(ax2,
+                    ds_q_sl_nonprec,
+                    ds_theta_e_sl_nonprec,
+                    'q [g/kg]',
+                    '$\Theta_e$ [K]',
+                    'shallow non prec',
+                    cmap, 
+                    norm)
+    
+    # add third subplot
+    ax3 = fig.add_subplot(223)
+    plot_scatter(ax3,
+                ds_q_cg_prec,
+                ds_theta_e_cg_prec,
+                'q [g/kg]',
+                '$\Theta_e$ [K]',
+                'congestus prec',
+                    cmap, 
+                    norm)
     
     
+    # add fourth subplot
+    ax4 = fig.add_subplot(224)
+    plot_scatter(ax4,
+                ds_q_cg_nonprec,
+                ds_theta_e_cg_nonprec,
+                'q [g/kg]',
+                '$\Theta_e$ [K]',
+                'congestus non prec',
+                    cmap, 
+                    norm)
+    
+    cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='viridis'), 
+                        ax=[ax1, ax2, ax3, ax4],  # Extend colorbar for the entire height of the figure
+                        orientation='vertical', 
+                        label='Altitude (m)')
+
+    fig.savefig('/net/ostro/plots_rain_paper/fig_04_scatter_q_theta_e.png')     
+    return(fig)
+
+
+def plot_scatter(ax, y, x, y_label, x_label, title, cmap, norm):
+    
+    # select values non nan in x and y in dataarrays
+    x_scatter = x.values.flatten()
+    y_scatter = y.values.flatten()
+    
+    print('time dimension', x.shape[0])
+    print('height dimension', x.shape[1])
+    
+    
+    # create a matrix of heights by repeating height values for each time step
+    height_matrix = np.repeat(x.height.values[:, np.newaxis], 
+                              x.shape[0], axis=0)
+    
+    print(np.shape(height_matrix), np.shape(x))
+    
+    z_scatter = height_matrix.flatten()
+    i_good = ~np.isnan(x_scatter) * ~np.isnan(x_scatter)
+    
+    x_scatter = x_scatter[i_good]
+    y_scatter = y_scatter[i_good]
+    z_scatter = z_scatter[i_good]*1e-3
+    print(len(x_scatter), len(y_scatter), len(z_scatter))
+    print(z_scatter)
+    pdb.set_trace()
+
+    # calculating mean values and std values of the distribution
+    mean_x = np.nanmean(x_scatter)
+    mean_y = np.nanmean(y_scatter)
+    std_x = np.nanstd(x_scatter)
+    std_y = np.nanstd(y_scatter)
+    
+    ax.scatter(x_scatter, 
+               y_scatter, 
+               c=z_scatter, 
+               cmap=cmap, 
+               s=0.1,
+               norm=norm,
+               alpha=0.5)
+    
+    # plot position of mean plus/minus the standard deviation
+    #ax.errorbar(mean_x,
+    #            mean_y,
+    #            xerr=std_x,
+    #            yerr=std_y,
+    #            fmt='o',
+    #            color='black',
+    #            label='mean $\pm$ std')
+    
+    ax.scatter(mean_x,
+               mean_y,
+               cmap='black',
+               marker='x',
+               label='mean')
+    
+    ax.set_title(title)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_ylim(0, 30)
+    ax.set_xlim(293, 300)
+    
+    return(None)
+
 # Example function to plot and save figures
 def plot_multipanel_figure(lcl_dc, 
                            ds_sl_prec, 
@@ -110,6 +268,10 @@ def plot_multipanel_figure(lcl_dc,
                             ds_theta_v_clear, 
                             ds_cb_sllcl,
                             ds_cb_cglcl,
+                            ds_sl_prec_hw,
+                            ds_sl_nonprec_hw,
+                            ds_cg_prec_hw,
+                            ds_cg_nonprec_hw,
                             data):
     
     
@@ -162,7 +324,7 @@ def plot_multipanel_figure(lcl_dc,
     
     # Create a GridSpec with 3 rows and 2 columns
     subplots = plt.subplots()
-    gs = subplots[0].add_gridspec(3, 4, height_ratios=[1, 3, 4], width_ratios=[2, 2, 2, 2])
+    gs = subplots[0].add_gridspec(3, 6, height_ratios=[1, 3, 4], width_ratios=[2, 2, 2, 2, 2, 2])
     
     # Add subplots with different sizes
     
@@ -184,7 +346,7 @@ def plot_multipanel_figure(lcl_dc,
     ax1.set_yticks(np.arange(-0.5, 1.5, 0.25), minor=True)
     ax1.set_yticklabels([-0.5, -0.25, "LCL", 0.25, 0.5, 1, 1.25, 1.5])
     ax1.set_ylabel("Height above\nLCL [km]")
-    ax1.set_title(" b) CB distributions", loc='left')
+    ax1.set_title(" b) CB distribution", loc='left')
     
     # profiles of w
     ax2 = fig.add_subplot(gs[1, 1])  # Second row, first column, profiles of w
@@ -193,12 +355,20 @@ def plot_multipanel_figure(lcl_dc,
                   ds_sl_nonprec, 
                   ds_cg_prec,
                   ds_cg_nonprec,
-                  -1, 1, 'w [m/s]')
-    ax2.set_title('c) Anomalies of vertical velocity', loc='left')
+                  -0.4, 0.4, 'w anomaly [m/s]')
+    ax2.set_title('c) w anomaly', loc='left')
 
+    ax2bis = fig.add_subplot(gs[1, 2])  # Second row, first column, profiles of w
+    plot_profiles(ax2bis, 
+                  ds_sl_prec_hw, 
+                  ds_sl_nonprec_hw, 
+                  ds_cg_prec_hw,
+                  ds_cg_nonprec_hw,
+                  -1, 1, 'H wind anomaly [m/s]')
+    ax2bis.set_title('d) Hspeed anomaly', loc='left')
 
     # profiles of q
-    ax3 = fig.add_subplot(gs[1, 2], sharey=ax2)  # Second row, second column profiles of q
+    ax3 = fig.add_subplot(gs[1, 3], sharey=ax2)  # Second row, second column profiles of q
     plot_profiles(ax3, 
                   ds_q_sl_prec, 
                   ds_q_sl_nonprec, 
@@ -212,30 +382,37 @@ def plot_multipanel_figure(lcl_dc,
              linewidth=3, 
              linestyle = 'dashdot')
 
-    ax3.set_title('d) Specific humidity', loc='left')
+    ax3.set_title('e) spec. humidity', loc='left')
 
  
     # profiles of theta_v
-    ax4 = fig.add_subplot(gs[1, 3], sharey=ax2)  # Second row, third column profiles of thetav
+    ax4 = fig.add_subplot(gs[1, 4], sharey=ax2)  # Second row, third column profiles of thetav
     plot_profiles(ax4, 
                   ds_theta_v_sl_prec, 
                   ds_theta_v_sl_nonprec, 
                   ds_theta_v_cg_prec, 
                   ds_theta_v_cg_nonprec, 
-                  300, 315, '$\Theta_v$[K]')
+                  300, 310, '$\Theta_v$[K]')
     ax4.plot(ds_theta_v_clear.mean("time"),
              ds_theta_v_clear.height* 1e-3,
              label='clear sky',
              color='black', 
              linewidth=3, 
              linestyle = 'dashdot')
-    ax4.set_title('e) $\Theta_v$', loc='left')
-    ax4.legend(frameon=False, loc='lower right')
+    ax4.set_title('f) Virt. pot. temp.', loc='left')
+
+    # last narrow subplot with the legend    
+    ax_legend = fig.add_subplot(gs[1, 5])  # Second row, right plot
+    ax_legend.axis('off')  # Turn off the axis
+
+    # Generate the legend from ax5
+    handles, labels = ax4.get_legend_handles_labels()
+    ax_legend.legend(handles, labels, loc='center', frameon=False)
+
             
     # scatter Ze vs Vd
-
-    ax5 = fig.add_subplot(gs[2, 0:2])  # Third row, left plot
-    ax5.set_title('f) Normalized Occurrences of Ze vs Vd', loc='left')
+    ax5 = fig.add_subplot(gs[2, 0:3])  # Third row, left plot
+    ax5.set_title('g) Normalized Occurrences of Ze vs Vd', loc='left')
 
     hist_d = ax5.hist2d(ze_c, 
                         vd_c, 
@@ -264,8 +441,8 @@ def plot_multipanel_figure(lcl_dc,
     
     # scatter Ze vs Sk
 
-    ax6 = fig.add_subplot(gs[2, 2:])  # Third row, right plot
-    ax6.set_title('g) Normalized Occurrences of Ze vs Sk', loc='left')
+    ax6 = fig.add_subplot(gs[2, 3:])  # Third row, right plot
+    ax6.set_title('h) Normalized Occurrences of Ze vs Sk', loc='left')
 
     hist_d = ax6.hist2d(ze_c, 
                         -sk_c, 
@@ -306,7 +483,7 @@ def plot_multipanel_figure(lcl_dc,
     plt.tight_layout()
     
     # Save the figure to a file
-    fig.savefig('/net/ostro/plots_rain_paper/fig_04_multipanel_figure.png')
+    fig.savefig('/net/ostro/plots_rain_paper/fig_04_multipanel_figure_new.png')
 
 def plot_distr(shallow, congestus):
     
@@ -334,25 +511,25 @@ def plot_distr(shallow, congestus):
     
 def plot_profiles(ax, ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, vmin, vmax, var_name):
     
-    ax.plot(ds_sl_nonprec.mean("time"),
+    ax.plot(ds_sl_nonprec.mean("time", skipna=True),
                  ds_sl_nonprec.height* 1e-3,
                  label='shallow non prec',
                  color=COLOR_SHALLOW, 
                  linewidth=3)
-    ax.plot(ds_cg_nonprec.mean("time"),
+    ax.plot(ds_cg_nonprec.mean("time", skipna=True),
                  ds_cg_nonprec.height* 1e-3,
                  label='congestus non prec',
                 color=COLOR_CONGESTUS, 
                 linewidth=3)
 
-    ax.plot(ds_sl_prec.mean("time"), 
+    ax.plot(ds_sl_prec.mean("time", skipna=True),
                  ds_sl_prec.height* 1e-3,
                  label='shallow prec',
                  color=COLOR_SHALLOW, 
                  linestyle=':', 
                 linewidth=3)
 
-    ax.plot(ds_cg_prec.mean("time"),
+    ax.plot(ds_cg_prec.mean("time", skipna=True),
                  ds_cg_prec.height* 1e-3,
                  label='congestus prec',
                  color=COLOR_CONGESTUS, 
@@ -400,6 +577,7 @@ def calc_lcl_grid_no_dc(ds, lcl_ds, height_var, time_var, var_name):
     # calculating vertical resolution
     #dz = 7.45
     dz = ds.height.diff(height_var).mean().values
+    print('dz is', dz)
     
     if var_name == 'anomaly':
         dz = 10# 7.45
@@ -481,7 +659,18 @@ def calc_cblcl(ds_cp):
     return ds_cb_sllcl, ds_cb_cglcl
 
 def prepare_therm_profiles(ds, ds_cp, var_string):
-    
+    """
+    function to assign to the dataset in ds a cloud classification flag from ds_cp 
+    and to interpolate data on the height referred to the lcl height
+
+    Args:
+        ds (datase): dataset containing the data to be regridded
+        ds_cp (dataset): dataset containing cloud properties data
+        var_string (string): name of the variable to be regridded
+
+    Returns:
+        _type_: _description_
+    """
     # interpolate classification of clouds over time stamps of thermodynamic profiles
     class_interp = ds_cp.interp(time=ds.time.values, method='nearest')                                                           
                                                                     
@@ -494,9 +683,6 @@ def prepare_therm_profiles(ds, ds_cp, var_string):
     
     ds_therm_lcl = calc_lcl_grid_no_dc(ds, ds_lcl_interp, 'height', 'time', var_string)
     
-    #f_plot_datarray(ds_therm_lcl, ds_therm_lcl.height.values, ds_therm_lcl.time.values, var_string) 
-    #print('plot done')
-
     # call classification of clouds and rain flags
     # selecting cloud types and rain/norain conditions
     is_shallow = class_interp.shape == 0
@@ -525,7 +711,17 @@ def prepare_therm_profiles(ds, ds_cp, var_string):
 
 def calc_thermo_prop():
     """
-    function to calculate thermodynamic properties from lidar data
+    function to calculate thermodynamic properties from lidar data. Lidar data are postprocessed
+    using the standard postprocessing for arthus data
+    We derive
+    - specific humidity
+    - virtual potential temperature
+    - pressure
+    - virtual temperature
+    - equivalent potential temperature
+    - dew point temperature
+    returns a dataset with all these variables
+    
     """
     from readers.lidars import f_call_postprocessing_arthus, f_read_variable_dictionary
 
@@ -586,7 +782,7 @@ def calc_thermo_prop():
             
     # interpolate on time resolution of the thermodynamic profiles
     ship_arthus = ship_data.interp(time=ds_arthus.time.values, method='nearest')
-    P_surf = ship_arthus.P.values
+    P_surf = ship_arthus.P.values # in Pa
 
     print('shape of P_surf', np.shape(P_surf))
     
@@ -613,17 +809,39 @@ def calc_thermo_prop():
     Cp = 1004. # [J Kg-1 K-1]
     Rd = 287.058  # gas constant for dry air [Kg-1 K-1 J]
     mr = ds_arthus.MR.values* 10**(-3) # g/kg to g/g
-    T = ds_arthus.T.values
+    T = ds_arthus.T.values # in K
     for indHeight in range(dim_h):
         k = Rd*(1-0.23*mr[:, indHeight])/Cp
         Theta_v[:,indHeight] = ( (1 + 0.61 * mr[:, indHeight]) * T[:, indHeight] * (P_surf/P[:,indHeight])**k)
     
+    # calculating dew point temperature profiles
+    Td = np.zeros((dim_t, dim_h))
+    theta_e = np.zeros((dim_t, dim_h))
+    
+    # converting T from K to C
+    T = T - 273.15
+    
+    from metpy.calc import dewpoint_from_specific_humidity, equivalent_potential_temperature
+    for i_h in range(dim_h):
+        Td[:, i_h] = dewpoint_from_specific_humidity(P[:, i_h]*100 * units.hPa, 
+                                                     T[:, i_h] * units('degree_Celsius'), 
+                                                     q[:, i_h] * units('g/kg')) # in C
+    
+    for i_h in range(dim_h):
+        theta_e[:, i_h] = equivalent_potential_temperature(P[:, i_h]*100 * units.hPa,
+                                                           T[:, i_h] * units('degree_Celsius'),
+                                                          Td[:, i_h] * units('degree_Celsius'))
 
+    # convert theta_e in K from celsius
+    theta_e = theta_e + 273.15
+    
     # store q, theta and theta_v in dataset
     ds_out = xr.Dataset(
         {
             "q": (["time", "height"], q),
             "theta_v": (["time", "height"], Theta_v),
+            'dew_point': (["time", "height"], Td),
+            'theta_e': (["time", "height"], theta_e),
         },
         coords={"time": ds_arthus.time, "height": ds_arthus.height},
     )
@@ -631,9 +849,9 @@ def calc_thermo_prop():
     # add units attributtes to q, theta and theta_v
     ds_out.q.attrs["units"] = "g/kg"
     ds_out.theta_v.attrs["units"] = "K"
+    ds_out.dew_point.attrs["units"] = "C"
+    ds_out.theta_e.attrs["units"] = "K"
     
-    
-
     return(ds_out)
 
 
@@ -758,13 +976,17 @@ def plot_q_theta_check(ds, path_paper_plots):
     return(ds)
 
 def split_dataset(ds):
-    # Assuming ds is an xarray Dataset with exactly two variables
-    var1, var2 = ds.data_vars.keys()
+    # Assuming ds is an xarray Dataset with exactly 4 variables, it returns variables splitted
+    var1, var2, var3, var4 = ds.data_vars.keys()
+    print(var1, var2, var3, var4)   
     
     ds1 = ds[[var1]]
     ds2 = ds[[var2]]
+    ds3 = ds[[var3]]
+    ds4 = ds[[var4]]
     
-    return ds1, ds2
+    return ds1, ds2, ds3, ds4
+
 
      
 def prepare_anomaly_profiles(ds_cp, var_string, ds_lcl):
@@ -785,20 +1007,25 @@ def prepare_anomaly_profiles(ds_cp, var_string, ds_lcl):
     """
     # reading arthus data anomalies
     ds_an = read_anomalies(var_string)
-
+    
+    # check if time is a variable with capital letter in ds_an
+    if 'Time' in ds_an:
+        # rename variables to create a dataset with all variables together
+        ds_an = ds_an.rename({'Height':'height', "Time":'time'})
+    
     # interpolate classification of clouds over anomalies time stamps
-    class_interp = ds_cp.interp(time=ds_an.Time.values, method='nearest')                                                           
+    class_interp = ds_cp.interp(time=ds_an.time.values, method='nearest')                                                           
                                                                     
     # read lcl and calculate its diurnal cycle at 15 mins and at 30 mins (for fluxes)
     ds_lcl = read_lcl()
     
-    ds_lcl_interp = ds_lcl.interp(time=ds_an.Time.values, method='nearest')
+    ds_lcl_interp = ds_lcl.interp(time=ds_an.time.values, method='nearest')
     
     # align lcl dataset to the y dataset of the anomalies with flags
     ds_lcl, ds_an, ds_class = xr.align(ds_lcl_interp, ds_an, class_interp, join="inner")
 
     # regridding data to height grid referred to lcl
-    ds_an_h_lcl = calc_lcl_grid_no_dc(ds_an, ds_lcl, 'Height', 'Time', 'anomaly')
+    ds_an_h_lcl = calc_lcl_grid_no_dc(ds_an, ds_lcl, 'height', 'time', 'anomaly')
     
     # selecting cloud types and rain/norain conditions
     is_shallow = ds_class.shape == 0
@@ -845,9 +1072,9 @@ def f_plot_datarray(da, x, y, var_name):
     fig = plt.figure(figsize=(10, 10))
     
     ax = fig.add_subplot(111)
-    mesh = ax.pcolormesh(y, x, da.T, cmap=CMAP)
+    mesh = ax.pcolormesh(y, x, da[var_name].values.T, cmap=CMAP)
     cbar = plt.colorbar(mesh, ax=ax, orientation='vertical')
-    fig.savefig('/net/ostro/plots_rain_paper/test_q_all_profiles.png')    
+    fig.savefig('/net/ostro/plots_rain_paper/test_'+var_name+'_all_profiles_lcl.png')    
     return(fig)
 
 
