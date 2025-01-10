@@ -26,6 +26,7 @@ from metpy.calc import specific_humidity_from_dewpoint
 from matplotlib.lines import Line2D
 from matplotlib.markers import MarkerStyle
 from matplotlib.transforms import Affine2D
+import pdb
 
 def main():
     
@@ -41,11 +42,8 @@ def main():
     ds_s2 = ds.sel(sounding=sound2)
     theta_e_1, q_1 = calc_paluch_quantities(ds_s1, '202002121415')
     theta_e_2, q_2 = calc_paluch_quantities(ds_s2, '202002121855')
-    
-    print(np.nanmax(ds_s1.alt.values), np.nanmin(ds_s1.alt.values))
-    
-    
-    
+
+        
     # reading heights of the soundings
     z_1 = ds_s1['alt'].values
     z_2 = ds_s2['alt'].values
@@ -55,8 +53,50 @@ def main():
     norm_s1 = mpl.colors.Normalize(vmin=0, vmax=4000.)
     cmap_s1.set_under('white')
     
+
+    # plot figure of Temperature and Relative Humidity profiles as a function of height
+    # create 2 subplots
+    fig, axs = plt.subplots(1,2, figsize=(10, 12), sharey=True)
+    ax = axs[0]
+    ax.plot(ds_s1['ta'],
+            z_1, 
+            label='Temperature', 
+            color='orange',
+            linewidth=4) # Temperature
+    ax2=axs[1]
+    ax2.plot(ds_s1['rh']*100, 
+            z_1, 
+            label='Relative humidity',
+            color='green',
+            linewidth=4) # Dewpoint
+    
+    ax.set_xlabel('Temperature (C)', fontsize=20)
+    ax2.set_xlabel('Relative humidity (%)', fontsize=20)
+    ax.set_ylabel('Height (m)', fontsize=20)
+    ax.set_xlim(280, 300)
+    ax2.set_xlim(70, 100)
+    for ax in axs[:]:
+        ax.spines["right"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["bottom"].set_linewidth(3)
+        ax.spines["left"].set_linewidth(3)
+        ax.tick_params(which='minor', length=5, width=2, labelsize=25)
+        ax.tick_params(which='major', length=7, width=3, labelsize=25)
+        ax.set_ylim(0, 1000)
+
+    # set all fonts to 20
+    rcParams.update({'font.size': 20})
+    
+    fig.tight_layout()
+    # save figure
+    fig.savefig('/net/ostro/plots_rain_paper/figKIT_sounding_'+date+'.png')
+    
+    
+    
     # plot figure Paluch plot
     fig, ax = plt.subplots()
+
     ax.invert_yaxis()  # Invert y-axis to decrease from top to bottom
     ax.scatter(theta_e_1, 
                q_1,
@@ -76,15 +116,14 @@ def main():
                label='18:55 LT')
     
     # plot colorbars
-    cbar1 = fig.colorbar(mpl.cm.ScalarMappable(norm=norm_s1,
-                                               cmap=cmap_s1), 
-                         ax=ax, 
-                         orientation='vertical', 
-                         label='Altitude (m)')
-
+    cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm_s1, cmap=cmap_s1), 
+                        ax=ax,  # Extend colorbar for the entire height of the figure
+                        orientation='vertical', 
+                        label='Altitude (m)')
     
-    ax.set_xlabel('Equivalent potential temperature (K)')
-    ax.set_ylabel('Specific humidity (g/kg)')
+    ax.set_xlabel('Equivalent potential temperature (K)', fontsize=20)
+    ax.set_ylabel('Specific humidity (g/kg)', fontsize=20)
+    
     ax.legend()
     ax.set_xlim(310, 350)
     ax.set_ylim(16,1)
@@ -129,15 +168,15 @@ def calc_paluch_quantities(ds, date=202002121415):
     
     
     # plot the input of the function
-    fig, ax = plt.subplots()
-    ax.plot(T, p, label='Temperature')
-    ax.plot(Td, p, label='Dewpoint')
-    ax.set_yscale('log')
-    ax.invert_yaxis()
-    ax.set_xlabel('Temperature (C)')
-    ax.set_ylabel('Pressure (hPa)')
-    ax.legend()
-    fig.savefig('/net/ostro/plots_rain_paper/profiles_rs_'+date+'.png')
+    ##fig, ax = plt.subplots()
+    #ax.plot(T, p, label='Temperature')
+    #ax.plot(Td, p, label='Dewpoint')
+    #ax.set_yscale('log')
+    #ax.invert_yaxis()
+    #ax.set_xlabel('Temperature (C)')
+    #ax.set_ylabel('Pressure (hPa)')
+    #ax.legend()
+    #fig.savefig('/net/ostro/plots_rain_paper/profiles_rs_'+date+'.png')
     
     
     return theta_e, q

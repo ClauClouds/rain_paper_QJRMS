@@ -383,7 +383,7 @@ def f_clean_lidar_signal_from_noise_v1(data_path, dict_var, noise_mask_file='/ne
         arthus_files = np.sort(glob.glob(data_path+'*_gr_10s_50m.cdf'))
 
     # merging data from each day in a single xarray dataset
-    print('arthus file ist:', arthus_files)
+    #print('arthus file ist:', arthus_files)
     arthus_data = xr.open_mfdataset(arthus_files, combine='nested', concat_dim='Time')
 
     # removing time duplicates for LHF and SHF file

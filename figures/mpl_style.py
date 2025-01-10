@@ -13,7 +13,10 @@ COLOR_S = cmc.grayC(0.25)
 CMAP = cmc.batlow
 CMAP_an = cmc.vik
 CMAP_discr = cmc.batlowW
-
+cmap_rs_shallow = cmc.roma
+cmap_rs_congestus = cmc.managua
+cmap_gif = cmc.vik
+cmap_gif2 = cmc.vanimo
 
 mpl.rcParams["legend.frameon"] = False
 
