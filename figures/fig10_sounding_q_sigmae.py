@@ -27,6 +27,9 @@ from matplotlib.lines import Line2D
 from matplotlib.markers import MarkerStyle
 from matplotlib.transforms import Affine2D
 import pdb
+from matplotlib.colors import BoundaryNorm
+from matplotlib.collections import LineCollection
+from matplotlib.lines import Line2D
 
 def main():
     
@@ -56,7 +59,7 @@ def main():
 
     # plot figure of Temperature and Relative Humidity profiles as a function of height
     # create 2 subplots
-    fig, axs = plt.subplots(1,2, figsize=(10, 12), sharey=True)
+    fig, axs = plt.subplots(1,2, figsize=(15, 18), sharey=True)
     ax = axs[0]
     ax.plot(ds_s1['ta'],
             z_1, 
@@ -85,9 +88,7 @@ def main():
         ax.tick_params(which='major', length=7, width=3, labelsize=25)
         ax.set_ylim(0, 1000)
 
-    # set all fonts to 20
-    rcParams.update({'font.size': 20})
-    
+    # set all fonts to 20    
     fig.tight_layout()
     # save figure
     fig.savefig('/net/ostro/plots_rain_paper/figKIT_sounding_'+date+'.png')
@@ -95,8 +96,17 @@ def main():
     
     
     # plot figure Paluch plot
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(14, 14))
 
+    # set font sizes of all the plot
+    fontsize = 30
+    rcParams.update({'font.size': fontsize})
+    marker_size = 300
+    
+    # Define the color boundaries and create a BoundaryNorm object
+    boundaries = np.linspace(0, 4000, 250)
+    norm = BoundaryNorm(boundaries, ncolors=256)
+    
     ax.invert_yaxis()  # Invert y-axis to decrease from top to bottom
     ax.scatter(theta_e_1, 
                q_1,
@@ -105,24 +115,28 @@ def main():
                cmap=cmap_s1,
                norm=norm_s1, 
                edgecolors='black',
-               label='14:15 LT')
+               label='14:15 LT', 
+               s=marker_size)
     ax.scatter(theta_e_2, 
                q_2, 
                c=z_2, 
                marker='^',
-               edgecolors='grey',
+               edgecolors='red',
                cmap=cmap_s1, 
                norm=norm_s1, 
-               label='18:55 LT')
+               label='18:55 LT', 
+               s=marker_size)
     
     # plot colorbars
     cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm_s1, cmap=cmap_s1), 
                         ax=ax,  # Extend colorbar for the entire height of the figure
                         orientation='vertical', 
-                        label='Altitude (m)')
+                        label='Altitude [m]')
+    # set fontsize of the colorbar
+    cbar.ax.tick_params(labelsize=fontsize)
     
-    ax.set_xlabel('Equivalent potential temperature (K)', fontsize=20)
-    ax.set_ylabel('Specific humidity (g/kg)', fontsize=20)
+    ax.set_xlabel('Equivalent potential temperature [K]', fontsize=fontsize)
+    ax.set_ylabel('Specific humidity [gkg$^{-1}$]', fontsize=fontsize)
     
     ax.legend()
     ax.set_xlim(310, 350)
@@ -131,6 +145,12 @@ def main():
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_linewidth(2)
     ax.spines['left'].set_linewidth(2)
+    ax.xaxis.set_minor_locator(ticker.AutoMinorLocator(n=5))
+    ax.tick_params(which='minor', length=5, width=2, labelsize = 5)
+    ax.xaxis.set_minor_locator(ticker.AutoMinorLocator(n=5))
+    ax.tick_params(axis='both', labelsize=24)
+    ax.get_xaxis().tick_bottom()
+    ax.get_yaxis().tick_left()
     fig.savefig('/net/ostro/plots_rain_paper/fig10_paluch_'+date+'.png')
 
 

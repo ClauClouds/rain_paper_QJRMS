@@ -101,7 +101,7 @@ def main():
     ds_mean_cg_prec = ds_mean_cg_prec.where(ds_mean_cg_prec.alt < 4000, drop=True)
     ds_clear = ds_clear.where(ds_clear.alt < 4000, drop=True)
 
-    fig_paper(ds_mean_sl_nonprec, ds_mean_cg_nonprec, ds_mean_sl_prec, ds_mean_cg_prec, ds_clear, ct_sl, ct_cg)
+    fig_paper_v2(ds_mean_sl_nonprec, ds_mean_cg_nonprec, ds_mean_sl_prec, ds_mean_cg_prec, ds_clear, ct_sl, ct_cg)
     #fig_paper2(ds_mean_sl_nonprec, ds_mean_cg_nonprec, ds_mean_sl_prec, ds_mean_cg_prec, ds_clear)
     
 def fig_paper2(ds_mean_sl_nonprec, ds_mean_cg_nonprec, ds_mean_sl_prec, ds_mean_cg_prec, ds_clear):
@@ -181,7 +181,155 @@ def fig_paper2(ds_mean_sl_nonprec, ds_mean_cg_nonprec, ds_mean_sl_prec, ds_mean_
     fig.savefig('/net/ostro/plots_rain_paper/figure9bis_rs_scatter.png') 
     return(fig)
 
+def fig_paper_v2(ds_mean_sl_nonprec, ds_mean_cg_nonprec, ds_mean_sl_prec, ds_mean_cg_prec, ds_clear, ct_sl, ct_cg):
+    '''
+    plot figure for the paper to justify cold dry air coming dow'''
+    from matplotlib import gridspec
+    
+    # calculate binned histograms of cloud top heights
+    bins = np.arange(0., 4000., 200.)
+    bin_width = bins[1] - bins[0]
 
+    hist_shallow, bins_shallow = np.histogram(ct_sl, bins=bins, density=True)
+    hist_congestus, bins_congestus = np.histogram(ct_cg, bins=bins, density=True)
+    
+    # Adjust bin coordinates
+    bins_shallow_centered = bins_shallow[:-1] + bin_width / 2
+    bins_congestus_centered = bins_congestus[:-1] + bin_width / 2
+    
+
+    # calculate q anomalies for each class to be plotted as colors
+    q_an_cong_prec = ds_mean_cg_prec.q.values - ds_clear.q.values
+    q_an_cong_nonprec = ds_mean_cg_nonprec.q.values - ds_clear.q.values
+    q_an_sl_nonprec = ds_mean_sl_nonprec.q.values - ds_clear.q.values
+    
+    # setting color maps edges
+    cmap_min = -4.
+    cmap_max = 4.
+    symbol_size = 150
+
+    font_val = 24
+    # Set the default font size to 20 for all fonts
+    mpl.rcParams['font.size'] = font_val
+    mpl.rcParams['axes.titlesize'] = font_val
+    mpl.rcParams['axes.labelsize'] = font_val
+    mpl.rcParams['xtick.labelsize'] = font_val-6
+    mpl.rcParams['ytick.labelsize'] = font_val-6
+    mpl.rcParams['legend.fontsize'] = font_val-6
+    mpl.rcParams['figure.titlesize'] = font_val
+    
+    # create a figure with two subplots
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 10), sharey=True)
+    
+    # Customize the subplots as needed
+    ax1.set_title('Shallow clouds')
+    ax2.set_title('Congestus clouds')
+
+    
+    # plot distributions of cloud bases along y axis on first subplot
+    ax1_twin = ax1.twiny()
+    ax1_twin.plot(hist_shallow, bins_shallow_centered, color='lightgray', linewidth=2, alpha=0.5, label='cloud tops shallow')
+    ax1_twin.plot(hist_congestus, bins_congestus_centered, color='dimgrey', linewidth=2, alpha=0.5, label='cloud tops congestus')
+    ax1_twin.fill_betweenx(bins_shallow_centered, 0., hist_shallow, color='lightgray', alpha=0.1)
+    ax1_twin.fill_betweenx(bins_congestus_centered, 0., hist_congestus, color='dimgrey', alpha=0.1)
+    ax1_twin.axis('off')
+    
+    # reverse x axis
+    #ax_twin.invert_xaxis()
+    # set x axis limits
+
+    # plot profile of clear sky theta_e as a reference
+    ax1.plot(ds_clear.theta_e,
+            ds_clear.alt,
+            color='black', 
+            linestyle='--',
+            linewidth=2)
+    
+    
+    # do the same as before but for the second subplot
+    ax2_twin = ax2.twiny()
+    ax2_twin.plot(hist_shallow, bins_shallow_centered, color='lightgray', linewidth=2, alpha=0.5, label='cloud tops shallow')
+    ax2_twin.plot(hist_congestus, bins_congestus_centered, color='dimgrey', linewidth=2, alpha=0.5, label='cloud tops congestus')
+    ax2_twin.fill_betweenx(bins_shallow_centered, 0., hist_shallow, color='lightgray', alpha=0.1)
+    ax2_twin.fill_betweenx(bins_congestus_centered, 0., hist_congestus, color='dimgrey', alpha=0.1)
+    ax2_twin.axis('off')
+    
+    # reverse x axis
+    #ax_twin.invert_xaxis()
+    # set x axis limits
+    ax1_twin.set_xlim(0., 0.01)
+    ax2_twin.set_xlim(0., 0.01)
+    ax1_twin.legend(loc='upper right', frameon=True, facecolor='white')
+
+    # plot profile of clear sky theta_e as a reference
+    ax2.plot(ds_clear.theta_e,
+            ds_clear.alt,
+            color='black', 
+            linestyle='--',
+            linewidth=2, 
+            alpha=0.5)
+    
+    # plot colored line for congestus non prec
+    line_cong = plot_colored_line(ax2, 
+                      ds_mean_cg_nonprec.theta_e, 
+                      ds_mean_cg_nonprec.alt, 
+                      q_an_cong_nonprec, 
+                      cmap_rs_congestus, 
+                      'congestus non prec',
+                      cmap_min,
+                      cmap_max)
+    
+     # plot colored line for congestus non prec
+    line = plot_colored_line(ax2, 
+                      ds_mean_cg_prec.theta_e, 
+                      ds_mean_cg_prec.alt, 
+                      q_an_cong_prec, 
+                      cmap_rs_congestus, 
+                      'congestus prec',
+                      cmap_min,
+                      cmap_max)
+    
+    # plot colored line for shallow non prec
+    line_sh = plot_colored_line(ax1, 
+                      ds_mean_sl_nonprec.theta_e, 
+                      ds_mean_sl_nonprec.alt, 
+                      q_an_sl_nonprec, 
+                      cmap_rs_congestus, 
+                      'shallow non prec',
+                      cmap_min,
+                      cmap_max)
+
+    
+    ax1.set_xlabel('$\Theta_e$ [K]')
+    ax1.set_xlim(322., 350.)
+    ax1.set_ylim(0., 4000.)
+    ax1.set_ylabel('Altitude [m]')
+    
+    ax2.set_xlabel('$\Theta_e$ [K]')
+    ax2.set_xlim(322., 350.)
+    ax2.set_ylim(0., 4000.)
+    fig.colorbar(line_cong, 
+                 ax=ax2, 
+                 orientation='horizontal', 
+                 pad=0.15, 
+                 label='q anomaly congestus [gkg$^{-1}$]')
+    
+    # add a second colorbar
+    fig.colorbar(line_sh, 
+                 ax=ax1, 
+                 orientation='horizontal', 
+                 pad=0.15, 
+                 label='q anomaly shallow [gkg$^{-1}$]')
+
+    
+    # plot ct distribution along y axis
+    #ax2.set_xlim(0., 0.1)
+
+    
+    #ax.legend(handles=[line_sh, line_cong, line], frameon=True)
+    fig.savefig('/net/ostro/plots_rain_paper/figure9bis_rs_v2.png')
+    
 def fig_paper(ds_mean_sl_nonprec, ds_mean_cg_nonprec, ds_mean_sl_prec, ds_mean_cg_prec, ds_clear, ct_sl, ct_cg):
     '''
     plot figure for the paper to justify cold dry air coming dow'''
@@ -318,6 +466,7 @@ def plot_colored_line(ax, x, y, z, cmap_name, label, cmap_min, cmap_max):
         line = ax.add_collection(lc)
         line.set_linestyle('--')
         lc.set_linewidth(4)
+
     elif label == 'congestus prec':
         lc = LineCollection(segments, cmap=cmap_name, norm=norm)
         # Set the values used for colormapping
@@ -331,8 +480,10 @@ def plot_colored_line(ax, x, y, z, cmap_name, label, cmap_min, cmap_max):
         lc.set_array(z)
         line = ax.add_collection(lc)
         line.set_linestyle('--')
-        lc.set_linewidth(2)
-    ax.legend(frameon=False)
+        lc.set_linewidth(6)
+    
+
+    # Add the legen
 
     return(line)
 
