@@ -150,3 +150,13 @@ def read_rain_ground():
     """
     ds_r = xr.open_dataset('/data/obs/campaigns/eurec4a/msm/rain_ground_classification_v3.nc')
     return(ds_r)
+
+
+def read_cloudtypes():
+
+    ds = xr.open_dataset(os.path.join(
+            "/data/obs/campaigns/eurec4a/msm/",
+            "cloud_lcl_classification_v3.nc",
+        ))
+    
+    return(ds)

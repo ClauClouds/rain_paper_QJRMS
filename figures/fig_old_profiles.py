@@ -12,11 +12,11 @@ sys.path.insert(
 
 import matplotlib.pyplot as plt
 import numpy as np
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 from fig04_diurnal import prepare_data
 from mpl_style import COLOR_N, COLOR_S, COLOR_T
 
-load_dotenv()
+#load_dotenv()
 
 
 def main():
@@ -123,7 +123,8 @@ def plot_profiles(
     for ax in axes[:2]:
         # northern region
         ax.plot(
-            hf_n, hf_n.height * 1e-3, color=COLOR_N, label="Northern", zorder=1
+            hf_n, hf_n.height * 1e-3, 
+            color=COLOR_N, label="Northern", zorder=1
         )
 
         # transition region

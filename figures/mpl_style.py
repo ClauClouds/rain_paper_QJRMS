@@ -7,9 +7,10 @@ import cmcrameri.cm as cmc
 
 COLOR_SHALLOW = "#ff9500"
 COLOR_CONGESTUS = "#008080"
-COLOR_N = cmc.grayC(0.75)
-COLOR_T = cmc.grayC(0.5)
-COLOR_S = cmc.grayC(0.25)
+COLOR_N = 'royalblue'#(237/255, 174/255, 73/255)#cmc.grayC(0.75)
+COLOR_T = 'lightsteelblue'#(209/255, 73/255, 91/255)#cmc.grayC(0.5)
+COLOR_S = 'lavender' #(0/255, 121/255, 140/255) #cmc.grayC(0.25)
+CMAP_HF_ALL = cmc.grayC
 CMAP = cmc.batlow
 CMAP_an = cmc.vik
 CMAP_discr = cmc.batlowW
