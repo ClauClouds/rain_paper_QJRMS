@@ -226,7 +226,7 @@ def visualize(da_cfad, da_cfad_norm):
         )
 
     plt.savefig(
-        os.path.join(os.environ["PATH_PLOT"], "cfad.png"),
+        os.path.join('/net/ostro/plots_rain_paper/', "cfad.png"),
     )
     plt.close()
 

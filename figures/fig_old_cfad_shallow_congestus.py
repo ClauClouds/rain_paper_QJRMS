@@ -13,10 +13,10 @@ from dask.diagnostics import ProgressBar
 from xhistogram.xarray import histogram
 
 from readers.cloudtypes import read_cloud_class
-from readers.wband import read_lwp
-from readers.wband import read_radar_multiple
+from readers.radar import read_lwp, read_radar_multiple
 from figures.mpl_style import CMAP
 from scipy.ndimage.filters import gaussian_filter
+from matplotlib.patches import Patch
 
 
 def main():
@@ -206,6 +206,7 @@ def visualize(da_cfad_s, da_cfad_norm_s, da_cfad_c, da_cfad_norm_c, da_cfad, da_
         ax.spines["left"].set_linewidth(1)
         ax.get_xaxis().tick_bottom()
         ax.get_yaxis().tick_left()
+        ax.grid(linestyle="--", linewidth=0.5, color='lightgrey')
 
     for i, ax in enumerate(axes.flatten()[:-1]):
         
@@ -219,7 +220,6 @@ def visualize(da_cfad_s, da_cfad_norm_s, da_cfad_c, da_cfad_norm_c, da_cfad, da_
             shading="nearest",
         )
 
-
         # plot contours of shallow clouds
         cs = ax.contour(da_cfad_norm_s.radar_reflectivity_bin, 
                         da_cfad_norm_s.height * 1e-3, 
@@ -228,9 +228,7 @@ def visualize(da_cfad_s, da_cfad_norm_s, da_cfad_c, da_cfad_norm_c, da_cfad, da_
                         cmap=plt.cm.Greys, 
                         interpolation='none'
         )
-    
-        
-        
+          
     # all observations
     da_cfad_all = da_cfad.sum("lwp_bin")
     da_cfad_all_norm = da_cfad_all / da_cfad_all.max(
@@ -245,9 +243,34 @@ def visualize(da_cfad_s, da_cfad_norm_s, da_cfad_c, da_cfad_norm_c, da_cfad, da_
         cmap=cmap,
         shading="nearest",
     )
-
-    fig.colorbar(im, ax=axes, label="Density", shrink=0.5, ticks=bounds)
-
+    # plot colorbar for congestus clouds
+    cbar_cu = fig.colorbar(im, ax=axes, label="Density Congestus", shrink=0.5, ticks=bounds)
+    
+    
+    # build a legend for the contour levels of the shallow clouds
+    legend_handles = [
+        Patch(facecolor='white', 
+              edgecolor='black', 
+              alpha=1, 
+              label='0.3'),
+        Patch(facecolor='grey', 
+              edgecolor='black', 
+              alpha=1, 
+              label='0.5'),
+        Patch(facecolor='black', 
+              edgecolor='black', 
+              alpha=1, 
+              label='0.7')]
+    
+    # add the legend for the contour lines of the shallow clouds
+    lg_cs = fig.legend(
+              handles=legend_handles,
+              loc='outside lower right',
+              bbox_to_anchor=(1.018,0.07), 
+              fontsize=8, 
+              title='Density Shallow',
+              title_fontsize=8)
+    
     for ax in axes.flatten():
         ax.set_xticks(np.arange(-60, 50, 5), minor=True)
         ax.set_xticks(np.arange(-60, 50, 20), minor=False)
@@ -270,7 +293,7 @@ def visualize(da_cfad_s, da_cfad_norm_s, da_cfad_c, da_cfad_norm_c, da_cfad, da_
         )
 
     plt.savefig(
-        os.path.join('/work/plots_rain_paper/', "figure3.png"),
+        os.path.join('/work/plots_rain_paper/', "figure3_cfad.png"),
         dpi=300,
         bbox_inches="tight",
         transparent=True,
