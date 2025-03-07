@@ -44,13 +44,17 @@ def main():
     
     # plot minutely ship position
     # Create a figure with two subplots
-    #fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 10))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 10))
     fig = plt.figure(figsize=(16, 10))
-    gs = fig.add_gridspec(1, 2, width_ratios=[1.5, 1])
+   
+
+    # Set the aspect ratio of both subplots to be equal
+    ax1.set_aspect('equal', adjustable='box')
+    ax2.set_aspect('equal', adjustable='box')
+    gs = fig.add_gridspec(1, 2, width_ratios=[1, 1])
 
     ax2 = fig.add_subplot(gs[0, 1])
     ax2.set_title("b) RV MSM trajectory during EUREC$^{4}$A", loc='left', fontweight='black')
-
     ax2.set_xlim([0, 0.55])
     ax2.set_yticks(np.arange(-1, 4.5, 1))
     ax2.set_yticklabels([-1, "LCL", 1, 2, 3, 4])
@@ -69,15 +73,16 @@ def main():
                           hf_t_co=dct_stats["hf_t_co"], 
                           hf_s_co=dct_stats["hf_s_co"]
                           )
-    
-    ax1 = fig.add_subplot(gs[0, 0], projection=ccrs.PlateCarree())
+
+    #ax1 = fig.add_subplot(gs[0, 0], projection=ccrs.PlateCarree())
     ax1.set_title("a) Hydrometeor fraction for different regions", loc='left', fontweight='black')
 
     # visualize trajectory
     visualize_trajectory(fig, ax1, class_cloud_data, extent_param, hf=dct_stats["hf_all"])
     
     ax1.grid(False) # remove grid
-
+    fig.tight_layout()
+    
     
     # saving figure as png
     plt.savefig(

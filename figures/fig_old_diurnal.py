@@ -123,7 +123,7 @@ def plot_diurnal(
     rel_occ_co_diurnal,
     occ_sh,
     occ_co,
-):
+    ):
     """
     Plot diurnal cycle
     """
@@ -189,7 +189,7 @@ def plot_diurnal(
 
     for ax in axes[:2]:
         ax.set_ylabel("Height above\nLCL [km]")
-        ax.set_yticks(np.arange(-0.5, 4.5, 0plt.25), minor=True)
+        ax.set_yticks(np.arange(-0.5, 4.5, 0.25), minor=True)
 
     for ax in axes:
         ax.set_xticks(np.arange(0, 24, 2))
