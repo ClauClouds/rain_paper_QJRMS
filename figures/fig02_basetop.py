@@ -4,13 +4,14 @@ Joint histogram of cloud base and cloud top height.
 
 import os
 import sys
+from matplotlib.lines import Line2D
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 #from dotenv import load_dotenv
-from mpl_style import CMAP
+from mpl_style import CMAP, COLOR_CONGESTUS, COLOR_SHALLOW  
 
 # add parent directory to path
 sys.path.insert(
@@ -132,14 +133,23 @@ def plot_figure2(da_hist, merian, shallow, congestus, cloudyflag):
                      density=True,
                      cumulative=True, 
                      linewidth=2)
-    ax[1].legend(frameon=False,loc=4)
+    # construct labels for the legend
+    handles = [Line2D([0], [0], 
+               color=COLOR_CONGESTUS, 
+               linewidth=4, 
+               label='Congestus clouds'),  
+                Line2D([0], [0], 
+               color=COLOR_SHALLOW, 
+               linewidth=4, 
+               label='Shallow clouds')]
+    ax[1].legend(handles=handles, frameon=False,loc=4)         
     #ax.set_yscale('log')
     #ax.set_xscale('log')
-    ax[1].set_xlabel('LWP / gm$^{-2}$')
+    ax[1].set_xlabel('LWP [gm$^{-2}$]')
     ax[1].set_xlim(0,550)
     ax[1].set_ylim(0.3,1)
-    ax[1].set_ylabel('Cumulated density / g$^{-1}$m$^{2}$')
-    
+    #ax[1].set_ylabel('Cumulated density / g$^{-1}$m$^{2}$')
+    ax[1].set_ylabel('Cumulated density')
 
     plt.savefig(
         os.path.join("/net/ostro/plots_rain_paper/", "figure02.png")

@@ -37,8 +37,9 @@ def main():
     
     # read and regrid lidar data with respect to lcl    
     da_T_lcl, da_MR_lcl, da_HW_lcl, da_LF_lcl, da_SF_lcl = read_and_regrid_lidar_wrt_lcl(path_diurnal_cycle_arthus)
-  
-    
+      
+    # pause code here
+    import pdb;#pdb.set_trace()
     # call plotting script to produce plot of the publication
     plot_diurnal(dct_stats, da_T_lcl, da_MR_lcl, da_HW_lcl, da_LF_lcl, da_SF_lcl)
 
@@ -119,6 +120,9 @@ def read_and_regrid_lidar_wrt_lcl(path_to_dc_files):
     LF_lcl = calc_lcl_grid(fluxes_ds, ds_lcl_diurnal_30, 'height_coarse', 'time_coarse', 'LHF')
     SF_lcl = calc_lcl_grid(fluxes_ds, ds_lcl_diurnal_30, 'height_coarse', 'time_coarse', 'SHF')
 
+    # interpolate horizontal wind on height grid from T_lcl
+    HW_lcl = HW_lcl.interp(height=T_lcl.height, method='nearest', kwargs={"fill_value": 0})
+    
     return(T_lcl, MR_lcl, HW_lcl, LF_lcl, SF_lcl)
 
 def calc_lcl_grid(ds, lcl_ds, height_var, time_var, var_name):
@@ -317,12 +321,12 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
     mask_LF = np.ma.masked_where(da_LF.values > 0. ,da_LF.values)
     mask_SF = np.ma.masked_where(da_SF.values > 0. ,da_SF.values)
 
-    norm = mcolors.BoundaryNorm(np.arange(0, 0.81, 0.05), CMAP.N)
+    norm = mcolors.BoundaryNorm(np.arange(0, 1.1, 0.1), CMAP.N)
 
     fig, axes = plt.subplots(5, 2, figsize=(25, 20), constrained_layout=True)
 
     axes[0,0].annotate(
-        "a) Shallow hydrometeor fraction (#{:,})".format(occ_sh.values),
+        "a) Shallow hydr. fraction (#{:,})".format(occ_sh.values),
         xy=(0, 1),
         xycoords="axes fraction",
         va="bottom",
@@ -331,7 +335,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         fontweight='black'
     )
     axes[1,0].annotate(
-        "b) Congestus hydrometeor fraction (#{:,})".format(occ_co.values),
+        "b) Congestus hydr. fraction (#{:,})".format(occ_co.values),
         xy=(0, 1),
         xycoords="axes fraction",
         va="bottom",
@@ -371,27 +375,27 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
     )
 
     kwargs = dict(shading="nearest", cmap=CMAP, norm=norm)
-    im = axes[0,0].pcolormesh(
+    im_sh = axes[0,0].pcolormesh(
         hf_sh_diurnal.hour,
         hf_sh_diurnal.height * 1e-3,
         hf_sh_diurnal.T,
         **kwargs
     )
-    im = axes[1,0].pcolormesh(
+    im_co = axes[1,0].pcolormesh(
         hf_co_diurnal.hour,
         hf_co_diurnal.height * 1e-3,
         hf_co_diurnal.T,
         **kwargs
     )
     
-    im = axes[2,0].pcolormesh(
+    im_co_r = axes[2,0].pcolormesh(
         hf_co_r_diurnal.hour,
         hf_co_r_diurnal.height * 1e-3,
         hf_co_r_diurnal.T,
         **kwargs
     )
     
-    im = axes[3,0].pcolormesh(
+    im_co_nr = axes[3,0].pcolormesh(
         hf_co_nr_diurnal.hour,
         hf_co_nr_diurnal.height * 1e-3,
         hf_co_nr_diurnal.T,
@@ -536,9 +540,9 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
     )
     
     cbar_hf = fig.colorbar(
-        im,
+        im_co_nr,
         ax=axes[:4,0],
-        ticks=np.arange(0, 0.8, 0.1),
+        ticks=np.arange(0, 1.1, 0.1),
     )
     cbar_hf.set_label("Hydrometeor fraction",fontsize=20)
     cbar_hf.ax.tick_params(labelsize=20)  
@@ -548,7 +552,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         pd.to_datetime(da_T.time.values).hour,
         da_T.height.values* 1e-3,
         da_T.T,
-        vmin=296,
+        vmin=297,
         vmax=300,
         **kwargs_lidar
     )
@@ -584,9 +588,15 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         **kwargs_lidar
     )
     # mesh over nan areas
-    c_HW = axes[2,1].contourf(pd.to_datetime(da_HW.time.values).hour,
-        da_HW.height.values* 1e-3,
-        mask_HW.T, 
+    #c_HW = axes[2,1].contourf(pd.to_datetime(da_HW.time.values).hour,
+    #    da_HW.height.values* 1e-3,
+    #    mask_HW.T, 
+    #    hatches='//',
+    #    cmap='gray', extend='both', alpha=1)
+    
+    c_HW = axes[2,1].contourf(pd.to_datetime(da_MR.time.values).hour,
+        da_MR.height.values* 1e-3,
+        mask_MR.T, 
         hatches='//',
         cmap='gray', extend='both', alpha=1)
     
@@ -599,12 +609,17 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         **kwargs_lidar
     )
     # mesh over nan areas
-    c_SF = axes[3,1].contourf(pd.to_datetime(da_SF.time.values).hour,
-        da_SF.height.values* 1e-3,
-        mask_SF.T, 
-        hatches='//',
-        cmap='Greys', extend='both', alpha=0.6)    
+    #c_SF = axes[3,1].contourf(pd.to_datetime(da_SF.time.values).hour,
+    #    da_SF.height.values* 1e-3,
+    #    mask_SF.T, 
+    #    hatches='//',
+    #    cmap='Greys', extend='both', alpha=0.6)    
     
+    c_SF = axes[3,1].contourf(pd.to_datetime(da_MR.time.values).hour,
+        da_MR.height.values* 1e-3,
+        mask_MR.T, 
+        hatches='//',
+        cmap='gray', extend='both', alpha=1)
     
     im_LF = axes[4,1].pcolormesh(
         pd.to_datetime(da_LF.time.values).hour,
@@ -615,18 +630,23 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         **kwargs_lidar,
     )
     # mesh over nan areas
-    c_LF = axes[4,1].contourf(pd.to_datetime(da_LF.time.values).hour,
-        da_LF.height.values* 1e-3,
-        mask_LF.T, 
+    #c_LF = axes[4,1].contourf(pd.to_datetime(da_LF.time.values).hour,
+    #    da_LF.height.values* 1e-3,
+    #    mask_LF.T, 
+    #    hatches='//',
+    #    cmap='Greys', extend='both', alpha=0.6)    
+    c_LF = axes[4,1].contourf(pd.to_datetime(da_MR.time.values).hour,
+        da_MR.height.values* 1e-3,
+        mask_MR.T, 
         hatches='//',
-        cmap='Greys', extend='both', alpha=0.6)    
-    
+        cmap='gray', extend='both', alpha=1)
         
     # T/MR axis
     axes[0,1].set_yticks(np.arange(-1, 1, 0.5))
     axes[0,1].set_ylabel("Height above\nLCL [km]", fontsize=25)
     axes[0,1].set_yticklabels([-1, -0.5, "LCL", 0.5], fontsize=20)
     axes[0,1].set_ylim(-0.5, 0.2)
+    axes[0,1].set_xlim(0, 23)
     #    [
     ##        da_T.height.isel(
     #            height=da_T.any("time").values.argmax()
@@ -640,6 +660,8 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
     axes[1,1].set_yticks(np.arange(-1, 1, 0.5))
     axes[1,1].set_yticklabels([-1, -0.5, "LCL", 0.5], fontsize=20)
     axes[1,1].set_ylim(-0.5, 0.2)
+    axes[1,1].set_xlim(0, 23)
+
     #    [
     #        da_MR.height.isel(
     #            height=da_MR.any("time").values.argmax()
@@ -651,60 +673,72 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
          
     # HW axis
     axes[2,1].set_ylabel("Height above\nLCL [km]", fontsize=25)
-    axes[2,1].set_yticks(np.arange(-1, 1, 0.5), minor=True)
-    axes[2,1].set_yticklabels([-1, -0.5, "LCL", 0.5, 1, 1.5], fontsize=20)
-    axes[2,1].set_ylim(
-        [
-            da_HW.height.isel(
-                height=da_HW.any("time").values.argmax()
-            )
-            * 1e-3,
-            0.3,
-        ]
-    )
-       
+    axes[2,1].set_yticks(np.arange(-1, 1, 0.5))
+    #axes[2,1].set_yticklabels([-1, -0.5, "LCL", 0.5, 1, 1.5], fontsize=20)
+    axes[2,1].set_yticklabels([-1, -0.5, "LCL", 0.5], fontsize=20)
+    #axes[2,1].set_ylim(
+    #    [
+    #        da_HW.height.isel(
+    ##            height=da_HW.any("time").values.argmax()
+    #        )
+    #        * 1e-3,
+    #        0.3,
+    #    ]
+    #)
+    axes[2,1].set_ylim(-0.5, 0.2)
+    axes[2,1].set_xlim(0, 23)
+
     # LHF/SHF axis
     axes[3,1].set_ylabel("Height above\nLCL [km]", fontsize=25)
     axes[3,1].set_yticks(np.arange(-1, 1, 0.5))
     axes[3,1].set_ylim(-0.5, 0.2)
     axes[3,1].set_yticklabels([-1, -0.5, "LCL", 0.5], fontsize=20)
+    axes[3,1].set_xlim(0, 23)
 
     axes[4,1].set_ylabel("Height above\nLCL [km]", fontsize=25)
     axes[4,1].set_yticks(np.arange(-1, 1, 0.5))
     axes[4,1].set_yticklabels([-1, -0.5, "LCL", 0.5], fontsize=20)
     axes[4,1].set_ylim(-0.5, 0.2)
+    axes[4,1].set_xlim(0, 23)
     
     # set now all colorbars for lidar plots
-    
-    cbar = fig.colorbar(
+    aspect_val = 10
+    cbar_T = fig.colorbar(
         im_T,
         ax=axes[0,1],
-        ticks=np.arange(296, 300, 1),
+        ticks=np.arange(297, 300, 0.5),
+        aspect=aspect_val,
+
     )
-    cbar.set_label('[K]', fontsize=20)
-    cbar.ax.tick_params(labelsize=20)  
+    cbar_T.set_label('[K]', fontsize=20)
+    cbar_T.ax.tick_params(labelsize=20)  
     
     cbar = fig.colorbar(
         im_MR,
         ax=axes[1,1],
         label="[gkg$^{-1}$]",
         ticks=np.arange(12, 18, 1),
+        aspect=aspect_val,
     )
-    cbar.set_label("[Kgm$^{-2}$]", fontsize=20)
+    cbar.set_label("[gkg$^{-1}$]", fontsize=20)
     cbar.ax.tick_params(labelsize=20)  
 
     cbar = fig.colorbar(
         im_HW,
         ax=axes[2,1],
+        label="[ms$^{-1}$]",
         ticks=np.arange(7, 10, 0.5),
+        aspect=aspect_val,
+
     )
-    cbar.set_label("[m$^{-1}$]",fontsize=20)
+    cbar.set_label("[ms$^{-1}$]",fontsize=20)
     cbar.ax.tick_params(labelsize=20)  
 
     cbar = fig.colorbar(
         im_SF,
         ax=axes[3,1],
         ticks=np.arange(-10, 20, 5),
+        aspect=aspect_val,
     )
     cbar.set_label("[Wm$^{-2}$]", fontsize=20)
     cbar.ax.tick_params(labelsize=20)  
@@ -713,6 +747,8 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         im_LF,
         ax=axes[4,1],
         ticks=np.arange(-10, 100, 10),
+        aspect=aspect_val,
+
     )   
     cbar.set_label("[Wm$^{-2}$]", fontsize=20)
     cbar.ax.tick_params(labelsize=20)  
