@@ -222,11 +222,10 @@ def fig_paper_v2(ds_mean_sl_nonprec, ds_mean_cg_nonprec, ds_mean_sl_prec, ds_mea
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 10), sharey=True)
     
-    # Customize the subplots as needed
-    ax1.set_title('Shallow clouds')
-    ax2.set_title('Congestus clouds')
-
-    
+    # Customize the subplots as neede
+    for ax, l in zip((ax1,ax2), ['a) Shallow clouds', 'b) Congestus clouds']):
+        ax.text(-0.02, 1.02, l,  fontweight='black', fontsize=20, transform=ax.transAxes)
+        
     # plot distributions of cloud bases along y axis on first subplot
     ax1_twin = ax1.twiny()
     ax1_twin.plot(hist_shallow, bins_shallow_centered, color='lightgray', linewidth=2, alpha=0.5, label='cloud tops shallow')
