@@ -491,7 +491,19 @@ def f_read_merian_data(input_data_string, var_string_arthus='T'):
     
     return(data, dates_list)       
        
-       
+def read_anomalies_and_rename(measurement):
+        
+    """
+    function to read arthus anomalies files
+    """
+    data = xr.open_dataset('/net/ostro/4sibylle/diurnal_cycle_arthus/5_mins/anomalies/'+measurement + '_arthus_anomaly.nc')    
+
+    # rename time and height with small letters and anomaly with the variable name
+    data_new = data.rename({'Time': 'time','Height':'height','anomaly':measurement+'_anomaly'})
+
+    return data_new
+
+    
 def read_anomalies(measurement):
     
     """
@@ -500,6 +512,7 @@ def read_anomalies(measurement):
     data = xr.open_dataset('/net/ostro/4sibylle/diurnal_cycle_arthus/5_mins/anomalies/'+measurement + '_arthus_anomaly.nc')    
     
     return data
+
     
 
 def convert_local_time_and_reorder_for_time_hh_mm(data):
