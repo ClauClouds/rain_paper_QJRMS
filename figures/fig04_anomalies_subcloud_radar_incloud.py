@@ -34,10 +34,16 @@ import metpy.calc as mpcalc
 from metpy.units import units
 import pdb
 from dask.diagnostics import ProgressBar
-ProgressBar().register()
+from figures.fig03_diurnal_all import prepare_data, statistics
 
+ProgressBar().register()
+from figures.fig03_diurnal_all import prepare_data, statistics
 def main():
     
+    # first row of the plot: relative occurrence of cloud types
+    ds = prepare_data()
+    dct_stats = statistics(ds)
+
     # first row of plot:  lcl diurnal cycle for the plot
     lcl_dc = read_diurnal_cycle_lcl(path_diurnal_cycle_arthus)
     
@@ -90,7 +96,8 @@ def main():
 
     # plot figure of anomalies of vertical velocity, specific humidity and virtual potential temperature
     # Example usage
-    plot_multipanel_figure(lcl_dc, 
+    plot_multipanel_figure(lcl_dc,
+                           dct_stats, 
                            ds_sl_prec, 
                            ds_sl_nonprec, 
                            ds_cg_prec,
@@ -187,6 +194,30 @@ def plot_scatter_q_theta_e(ds_q_sl_prec,
     return(fig)
 
 
+def create_time(hours, month, year, today):
+    """
+    function to create a time array that works for plotting relative occurrences 
+    over the diurnal cycle of lcl
+
+    Args:
+        hours (array): _description_
+        month (scalar): current month
+        year (scalar): current year
+        today(string): insert today's date
+    Returns:
+        _type_: _description_
+    """
+    import numpy as np
+    import pandas as pd
+
+    hh = np.array(hours)
+    base_date =  np.datetime64(f'{year}-{month:02d}-'+today)
+
+    # Create the datetime64 array with the specified hours
+    datetime_array = base_date + pd.to_timedelta(hh, unit='h')
+    
+    return datetime_array
+
 def plot_scatter(ax, y, x, y_label, x_label, title, cmap, norm):
     
     # select values non nan in x and y in dataarrays
@@ -252,6 +283,7 @@ def plot_scatter(ax, y, x, y_label, x_label, title, cmap, norm):
 
 # Example function to plot and save figures
 def plot_multipanel_figure(lcl_dc, 
+                           ds_stats,
                            ds_sl_prec, 
                            ds_sl_nonprec, 
                            ds_cg_prec,
@@ -274,6 +306,17 @@ def plot_multipanel_figure(lcl_dc,
                             ds_cg_nonprec_hw,
                             data):
     
+    # Set the default font size for all elements
+    plt.rcParams.update({'font.size': 12})
+    
+    # read relative occurrences of cloud types
+    rel_occ_co_r_diurnal=ds_stats["rel_occ_co_r_diurnal"]
+    rel_occ_co_nr_diurnal=ds_stats["rel_occ_co_nr_diurnal"]
+    rel_occ_sh_diurnal=ds_stats["rel_occ_sh_diurnal"]
+    rel_occ_co_diurnal=ds_stats["rel_occ_co_diurnal"]
+    
+    # convert rel_occ_co_diurnal.hour into a datetime object
+    time_rel_occ = create_time(rel_occ_co_diurnal.hour.values, 3, 2025, '11')
     
     bins = np.arange(-0.5, 1.75,0.25)
     bin_width = bins[1] - bins[0]
@@ -330,12 +373,72 @@ def plot_multipanel_figure(lcl_dc,
     
     # lcl diurnal cycle
     ax0 = fig.add_subplot(gs[0, :])  # First row, spans all columns
-    ax0.plot(lcl_dc.time.values, lcl_dc.lcl_dc.values, linewidth=3, color='black')
-    ax0.set_title(' a) LCL diurnal cycle', loc='left')
+    ax0.plot(lcl_dc.time.values, lcl_dc.lcl_dc.values, linewidth=3, color='black', label='LCL')
+    ax0.set_title(' a) LCL diurnal cycle', loc='left', fontweight='black')
     ax0.set_ylabel('Height [m]')
     ax0.set_xlabel('Time [hh:mm] (Local time)')
     ax0.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    ax0.grid(False)
+    ax0.set_xlim([lcl_dc.time.values[0], lcl_dc.time.values[-1]])
+
+    # add new y axis for cloud relative occurrence
+    ax0b = ax0.twinx()
+    ax0b.grid(False)
+    ax0b.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    ax0b.set_ylabel("Rel. Occ.")
+    ax0b.set_ylim(0, 0.07)
+    ax0b.plot(
+        time_rel_occ,
+        rel_occ_sh_diurnal,
+        color=COLOR_SHALLOW,
+        label="Shallow",
+        linewidth=3, 
+        alpha=0.5
+    )
+    ax0b.plot(
+        time_rel_occ,
+        rel_occ_co_diurnal,
+        color=COLOR_CONGESTUS,
+        label="Congestus",
+        linewidth=3,
+        alpha=0.5
+
+    )
     
+    ax0b.plot(
+        time_rel_occ,
+        rel_occ_co_r_diurnal,
+        color=COLOR_CONGESTUS,
+        label="Congestus prec",
+        linestyle='--',
+        linewidth=3,
+        alpha=0.5
+
+    )
+    
+    ax0b.plot(
+        time_rel_occ,
+        rel_occ_co_nr_diurnal,
+        color=COLOR_CONGESTUS,
+        label="Congestus non prec",
+        linestyle=':', 
+        linewidth=3,
+        alpha=0.5
+
+    )
+
+
+    # Retrieve the legend handles and labels from both axes
+    handles0, labels0 = ax0.get_legend_handles_labels()
+    handles0b, labels0b = ax0b.get_legend_handles_labels()
+
+    # Combine the handles and labels
+    handles = handles0 + handles0b
+    labels = labels0 + labels0b
+
+    # Create a single legend with the combined handles and labels
+    ax0b.legend(handles, labels, loc="upper left", frameon=False)
+        
     # cloud base height distributions
     ax1 = fig.add_subplot(gs[1, 0])  # Second row, first column, profiles of w
     ax1.plot(hist_shallow, bins_shallow_centered, color=COLOR_SHALLOW, linewidth=2)
@@ -346,7 +449,8 @@ def plot_multipanel_figure(lcl_dc,
     ax1.set_yticks(np.arange(-0.5, 1.5, 0.25), minor=True)
     ax1.set_yticklabels([-0.5, -0.25, "LCL", 0.25, 0.5, 1, 1.25, 1.5])
     ax1.set_ylabel("Height above\nLCL [km]")
-    ax1.set_title(" b) CB distribution", loc='left')
+    ax1.set_xlabel("Norm. Occ.")
+    ax1.set_title(" b) CB distribution", loc='left', fontweight='black')
     
     # profiles of w
     ax2 = fig.add_subplot(gs[1, 1])  # Second row, first column, profiles of w
@@ -356,7 +460,7 @@ def plot_multipanel_figure(lcl_dc,
                   ds_cg_prec,
                   ds_cg_nonprec,
                   -0.4, 0.4, 'w anomaly [m/s]')
-    ax2.set_title('c) w anomaly', loc='left')
+    ax2.set_title('c) w anomaly', loc='left', fontweight='black')
 
     ax2bis = fig.add_subplot(gs[1, 2])  # Second row, first column, profiles of w
     plot_profiles(ax2bis, 
@@ -365,7 +469,7 @@ def plot_multipanel_figure(lcl_dc,
                   ds_cg_prec_hw,
                   ds_cg_nonprec_hw,
                   -1, 1, 'H wind anomaly [m/s]')
-    ax2bis.set_title('d) Hspeed anomaly', loc='left')
+    ax2bis.set_title('d) Hspeed anomaly', loc='left', fontweight='black')
 
     # profiles of q
     ax3 = fig.add_subplot(gs[1, 3], sharey=ax2)  # Second row, second column profiles of q
@@ -382,7 +486,7 @@ def plot_multipanel_figure(lcl_dc,
              linewidth=3, 
              linestyle = 'dashdot')
 
-    ax3.set_title('e) spec. humidity', loc='left')
+    ax3.set_title('e) spec. humidity', loc='left', fontweight='black')
 
  
     # profiles of theta_v
@@ -399,20 +503,20 @@ def plot_multipanel_figure(lcl_dc,
              color='black', 
              linewidth=3, 
              linestyle = 'dashdot')
-    ax4.set_title('f) Virt. pot. temp.', loc='left')
+    ax4.set_title('f) Virt. pot. temp.', loc='left', fontweight='black')
 
     # last narrow subplot with the legend    
     ax_legend = fig.add_subplot(gs[1, 5])  # Second row, right plot
     ax_legend.axis('off')  # Turn off the axis
 
-    # Generate the legend from ax5
+    # Generate the legend from ax4
     handles, labels = ax4.get_legend_handles_labels()
     ax_legend.legend(handles, labels, loc='center', frameon=False)
 
             
     # scatter Ze vs Vd
     ax5 = fig.add_subplot(gs[2, 0:3])  # Third row, left plot
-    ax5.set_title('g) Normalized Occurrences of Ze vs Vd', loc='left')
+    ax5.set_title('g) Normalized Occurrences of Ze vs Vd', loc='left', fontweight='black')
 
     hist_d = ax5.hist2d(ze_c, 
                         vd_c, 
@@ -429,8 +533,7 @@ def plot_multipanel_figure(lcl_dc,
                         np.arange(np.nanmin(hist_ZEVD_cloud_s),
                                 np.nanmax(hist_ZEVD_cloud_s), 
                                 (np.nanmax(hist_ZEVD_cloud_s)- np.nanmin(hist_ZEVD_cloud_s))/10), 
-                        cmap=plt.cm.Greys,
-                        linewidth=8)
+                        cmap=plt.cm.Greys)
     ax5.clabel(cs, inline=True)
     cbar.set_label('norm. occ. congestus clouds')
     #cbar.ax.tick_params(labelsize=25)
@@ -442,7 +545,7 @@ def plot_multipanel_figure(lcl_dc,
     # scatter Ze vs Sk
 
     ax6 = fig.add_subplot(gs[2, 3:])  # Third row, right plot
-    ax6.set_title('h) Normalized Occurrences of Ze vs Sk', loc='left')
+    ax6.set_title('h) Normalized Occurrences of Ze vs Sk', loc='left', fontweight='black')
 
     hist_d = ax6.hist2d(ze_c, 
                         -sk_c, 
@@ -467,7 +570,7 @@ def plot_multipanel_figure(lcl_dc,
     ax6.set_ylim(-1., 1.)
     ax6.set_xlim(-50.,25.)
     
-    for ax in [ax0, ax1, ax2, ax3, ax4, ax5, ax6]:  # Loop over all axes    
+    for ax in [ax0, ax1, ax2, ax2bis, ax3, ax4, ax5, ax6]:  # Loop over all axes    
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.spines["bottom"].set_linewidth(2)
@@ -480,6 +583,8 @@ def plot_multipanel_figure(lcl_dc,
     
     
     # Adjust layout
+    gs.tight_layout(fig, h_pad=0.1)
+
     plt.tight_layout()
     
     # Save the figure to a file
