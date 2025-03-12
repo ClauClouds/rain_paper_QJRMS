@@ -28,7 +28,7 @@ def main():
     cloud_properties['flag_rain_ground'] = (('time'), flags.flag_rain_ground.values)
     cloud_properties['flag_rain'] = (('time'), flags.flag_rain.values)
     cloud_properties['virga_depth'] = (('time'), flags.virga_depth.values)
-    cloud_properties['cloud_base'] = (('time'), flags.cloud_base.values)
+    cloud_properties['cloud_base'] = (('time'), flags.cloud_base.values)    
 
     # read anomalies for T, MR, VW
     T_anomaly  = read_anomalies_and_rename('T')
@@ -38,26 +38,29 @@ def main():
     # aligning anomalies and classification of clouds 
     T, MR, VW = xr.align(T_anomaly, MR_anomaly, VW_anomaly)      
     cloud_prop = cloud_properties.interp(time=T.time.values, method='nearest')
-
-
+    
     # merging datasets obtained (classification and anomalies)
     merian_dataset = xr.merge([T, MR, VW, cloud_prop], compat='override')
-    print('height in merian dataset', merian_dataset.height.values)
 
-    print(merian_dataset)
+    # print all variable names in merian dataset to check if everything is correct
+    print(merian_dataset.variables)
+    
+    # constructing boolean arrays for shallow and congestus clouds
+    is_shallow = cloud_prop.shape.values == 0
+    is_no_surf_rain = cloud_prop.flag_rain_ground.values == 0
+    is_rain_air = cloud_prop.flag_rain.values == 1
+    is_congestus = cloud_prop.shape.values == 1
+    
+    # finding indeces of virga shallow
+    virga_shallow = is_no_surf_rain & is_shallow & is_rain_air
+    virga_congestus = is_no_surf_rain & is_congestus & is_rain_air
+    
+    # selecting shallow and congestus datasets
+    anomalies_shallow = merian_dataset.isel(time=virga_shallow)
+    anomalies_congestus = merian_dataset.isel(time=virga_congestus)
+    print(len(anomalies_shallow.time.values), 'number of shallow virga cases')
+    print(len(anomalies_congestus.time.values), 'number of congestus virga cases')
     pdb.set_trace()
-    # selecting virga conditions
-    ind_virga = np.where((merian_dataset.flag_rain_ground.values == 0) * (merian_dataset.flag_rain.values == 1))[0]
-    virga = merian_dataset.isel(time=ind_virga)
-        
-        
-    # segregating with respect to shallow and deep clouds
-    ind_shallow = np.where((virga.shape.values == 0))[0]
-    ind_deep = np.where((virga.shape.values == 1))[0]
-    data_virga_shallow = virga.isel(time=ind_shallow)
-    data_virga_deep = virga.isel(time=ind_deep)
-    print('height in data_virga_shallow', data_virga_shallow.height.values)
-
 
     # calculating virga depht bins and labels
     virga_depth_binned_s, virga_depth_labels_s = f_calc_virga_bins(0., 250., 20.)
@@ -66,14 +69,14 @@ def main():
     # if file not existing then run the code
     if not os.path.exists('/work/plots_rain_paper/ncdf_ancillary_files_QJRMS/shallow_dataset_virga_env.nc'):
         print('calculating shallow dataset')
-        shallow_dataset = f_calc_mean_std_arthus_profiles(data_virga_shallow, virga_depth_binned_s)
+        shallow_dataset = f_calc_mean_std_arthus_profiles(anomalies_shallow, virga_depth_binned_s)
         shallow_dataset.to_netcdf('/net/ostro/plots_rain_paper/ncdf_ancillary_files_QJRMS/shallow_dataset_virga_env.nc')
     else:
         print('reading shallow dataset')
         shallow_dataset = xr.open_dataset('/work/plots_rain_paper/ncdf_ancillary_files_QJRMS/shallow_dataset_virga_env.nc')
     if not os.path.exists('/work/plots_rain_paper/ncdf_ancillary_files_QJRMS/congestus_dataset_virga_env.nc'):
         print('calculating congestus dataset')
-        congestus_dataset = f_calc_mean_std_arthus_profiles(data_virga_deep,virga_depth_binned_d)
+        congestus_dataset = f_calc_mean_std_arthus_profiles(anomalies_congestus,virga_depth_binned_d)
         congestus_dataset.to_netcdf('/work/plots_rain_paper/ncdf_ancillary_files_QJRMS/congestus_dataset_virga_env.nc')
     else:
         print('reading congestus dataset')
@@ -225,8 +228,8 @@ def visualize_env_conditions_virga(shallow_dataset, congestus_dataset):
     VW_count_filter_c = np.ma.masked_where(congestus_dataset.VW_count.values > 200, congestus_dataset.VW_count.values)
     
     
-    vmin_T = -4
-    vmax_T = 4
+    vmin_T = -2
+    vmax_T = 2
     mesh_T_s = axs[0,0].pcolormesh(shallow_dataset.virga_bins.values, 
                                    shallow_dataset.range.values, 
                                    shallow_dataset.T_profiles.values.T, 
@@ -254,8 +257,8 @@ def visualize_env_conditions_virga(shallow_dataset, congestus_dataset):
     cbar.set_label('Anomaly \n Air Temperature [K]', fontsize=25)
     cbar.ax.tick_params(labelsize=25) 
     
-    vmin_MR = -3
-    vmax_MR = 3
+    vmin_MR = -2
+    vmax_MR = 2
     mesh_MR_s = axs[1,0].pcolormesh(shallow_dataset.virga_bins.values, 
                                    shallow_dataset.range.values, 
                                    shallow_dataset.MR_profiles.values.T, 
@@ -342,11 +345,11 @@ def visualize_env_conditions_virga(shallow_dataset, congestus_dataset):
             axs[i,j].tick_params(axis='both', labelsize=20)
             axs[i,j].get_xaxis().tick_bottom()
             axs[i,j].get_yaxis().tick_left()
-            axs[i,0].set_ylim(200.,1100.)
-            axs[i,1].set_ylim(200.,2000.)
+            axs[i,0].set_ylim(250.,1100.)
+            axs[i,1].set_ylim(250.,2000.)
             axs[i,j].grid(False)
             axs[i,0].set_xlim(30., 220.)
-            axs[i,1].set_xlim(50., 640.)
+            axs[i,1].set_xlim(80., 600.)
             axs[2,j].set_xlabel('Virga depth [m]', fontsize=20)
             axs[i,j].set_ylabel('Height [m]', fontsize=20)
             axs[i,0].plot(shallow_dataset.virga_bins.values, 
@@ -460,7 +463,7 @@ def visualize_counts(shallow_dataset, congestus_dataset):
             axs[i,j].tick_params(axis='both', labelsize=20)
             axs[i,j].get_xaxis().tick_bottom()
             axs[i,j].get_yaxis().tick_left()
-            axs[i,j].set_ylim(200.,1500.)
+            axs[i,j].set_ylim(250.,1500.)
             axs[i,0].set_xlim(0., 250.)
             axs[i,1].set_xlim(0., 750.)
             axs[2,j].set_xlabel('Virga depth [m]', fontsize=20)
