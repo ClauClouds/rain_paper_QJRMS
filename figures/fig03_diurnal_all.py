@@ -16,6 +16,7 @@ from readers.lcl import read_lcl
 from datetime import datetime
 import os
 import sys
+import pdb
 import pandas as pd
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -23,17 +24,24 @@ import numpy as np
 import xarray as xr
 #from dotenv import load_dotenv
 from mpl_style import CMAP, COLOR_CONGESTUS, COLOR_SHALLOW
+from cloudtypes.path_folders import path_diurnal_cycle_arthus
+from readers.lcl import read_lcl, read_diurnal_cycle_lcl
+import pandas as pd
 
-    
+
 def main():
     """
     Create diurnal cycle of hydrometeor fraction
     """
-    import pandas as pd
+   
+    # read and calculate cloud properties
     ds = prepare_data()
-
     dct_stats = statistics(ds)
-
+    
+    # lcl diurnal cycle for the plot
+    print(path_diurnal_cycle_arthus)
+    lcl_dc = read_diurnal_cycle_lcl(path_diurnal_cycle_arthus)
+    
     
     # read and regrid lidar data with respect to lcl    
     da_T_lcl, da_MR_lcl, da_HW_lcl, da_LF_lcl, da_SF_lcl = read_and_regrid_lidar_wrt_lcl(path_diurnal_cycle_arthus)
@@ -41,7 +49,7 @@ def main():
     # pause code here
     import pdb;#pdb.set_trace()
     # call plotting script to produce plot of the publication
-    plot_diurnal(dct_stats, da_T_lcl, da_MR_lcl, da_HW_lcl, da_LF_lcl, da_SF_lcl)
+    plot_diurnal(dct_stats, da_T_lcl, da_MR_lcl, da_HW_lcl, da_LF_lcl, da_SF_lcl, lcl_dc)
 
 
 
@@ -85,10 +93,12 @@ def calc_diurnal_lcl(ds, path_out, avg_time='15'):
                                        coords = coords,
                                        attrs = global_attributes)
     # storing data to ncdf
-    ds_lcl_dc.to_netcdf(path_out+'_lcl_diurnal_cycle.nc',
-                   encoding={'lcl_dc':{"zlib":True, "complevel":9},\
-                    "time": {"units": "seconds since 2020-01-01", "dtype": "i4"}})
+   #ds_lcl_dc.to_netcdf(path_out+avg_time'_lcl_diurnal_cycle.nc',
+   #                encoding={'lcl_dc':{"zlib":True, "complevel":9},\
+   #                 "time": {"units": "seconds since 2020-01-01", "dtype": "i4"}})
     
+    # set permissions on the file
+    #os.chmod(path_out+'_lcl_diurnal_cycle.nc', 0o777)
     return ds_lcl_dc
 
 def read_and_regrid_lidar_wrt_lcl(path_to_dc_files):
@@ -110,6 +120,7 @@ def read_and_regrid_lidar_wrt_lcl(path_to_dc_files):
         
     # read lcl and calculate its diurnal cycle at 15 mins and at 30 mins (for fluxes)
     ds_lcl = read_lcl()
+    print('lcl data read')
     ds_lcl_diurnal_15 = calc_diurnal_lcl(ds_lcl, path_diurnal_cycle_arthus, '15')
     ds_lcl_diurnal_30 = calc_diurnal_lcl(ds_lcl, path_diurnal_cycle_arthus, '30')
 
@@ -288,7 +299,31 @@ def prepare_data():
 
 
 
-def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
+def create_time(hours, month, year, today):
+    """
+    function to create a time array that works for plotting relative occurrences 
+    over the diurnal cycle of lcl
+
+    Args:
+        hours (array): _description_
+        month (scalar): current month
+        year (scalar): current year
+        today(string): insert today's date
+    Returns:
+        _type_: _description_
+    """
+    import numpy as np
+    import pandas as pd
+
+    hh = np.array(hours)
+    base_date =  np.datetime64(f'{year}-{month:02d}-'+today)
+
+    # Create the datetime64 array with the specified hours
+    datetime_array = base_date + pd.to_timedelta(hh, unit='h')
+    
+    return datetime_array
+
+def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF, lcl_dc):
     """
     Plot diurnal cycle
     """
@@ -321,6 +356,10 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
     mask_LF = np.ma.masked_where(da_LF.values > 0. ,da_LF.values)
     mask_SF = np.ma.masked_where(da_SF.values > 0. ,da_SF.values)
 
+    # convert rel_occ_co_diurnal.hour into a datetime object
+    time_rel_occ = create_time(rel_occ_co_diurnal.hour.values, 3, 2025, '11')
+    
+    
     norm = mcolors.BoundaryNorm(np.arange(0, 1.1, 0.1), CMAP.N)
 
     fig, axes = plt.subplots(5, 2, figsize=(25, 20), constrained_layout=True)
@@ -365,7 +404,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
     )
 
     axes[4,0].annotate(
-        "e) Relative occurrence",
+        "e) LCL and relative occurrence",
         xy=(0, 1),
         xycoords="axes fraction",
         va="bottom",
@@ -402,23 +441,44 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         **kwargs
     )
     
-    axes[4,0].plot(
-        rel_occ_sh_diurnal.hour,
+    # adding lcl diurnal cycle
+    axes[4,0].plot(lcl_dc.time.values, 
+                   lcl_dc.lcl_dc.values, 
+                   linewidth=3, 
+                   color='black', 
+                   label='LCL')
+    axes[4,0].set_ylabel('Height [m]')
+    axes[4,0].set_xlabel('Time [hh:mm] (Local time)')
+    axes[4,0].xaxis.set_major_formatter(mdates.DateFormatter('%H'))
+    axes[4,0].grid(False)
+    axes[4,0].set_xlim([lcl_dc.time.values[0], lcl_dc.time.values[-1]])
+    axes[4,0].tick_params(axis='both', which='major', labelsize=20)
+
+    # adding twix axes for relative occurrence
+    axtwin = axes[4,0].twinx()
+    axtwin.grid(False)
+    axtwin.xaxis.set_major_formatter(mdates.DateFormatter('%H'))
+    axtwin.set_ylabel("Rel. Occ.", fontsize=20)
+    axtwin.set_ylim(0, 0.07)
+    axtwin.tick_params(axis='both', which='major', labelsize=20)
+
+    axtwin.plot(
+        time_rel_occ,
         rel_occ_sh_diurnal,
         color=COLOR_SHALLOW,
         label="Shallow",
         linewidth=3
     )
-    axes[4,0].plot(
-        rel_occ_co_diurnal.hour,
+    axtwin.plot(
+        time_rel_occ,
         rel_occ_co_diurnal,
         color=COLOR_CONGESTUS,
         label="Congestus",
         linewidth=3
     )
     
-    axes[4,0].plot(
-        rel_occ_co_r_diurnal.hour,
+    axtwin.plot(
+        time_rel_occ,
         rel_occ_co_r_diurnal,
         color=COLOR_CONGESTUS,
         label="Congestus rain",
@@ -426,8 +486,8 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         linewidth=3
     )
     
-    axes[4,0].plot(
-        rel_occ_co_nr_diurnal.hour,
+    axtwin.plot(
+        time_rel_occ,
         rel_occ_co_nr_diurnal,
         color=COLOR_CONGESTUS,
         label="Congestus non rain",
@@ -435,7 +495,18 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         linewidth=3,
     )
     
-    axes[4,0].legend(loc="upper right", frameon=False, fontsize=15)
+    # Retrieve the legend handles and labels from both axes
+    handles0, labels0 = axes[4,0].get_legend_handles_labels()
+    handles0b, labels0b = axtwin.get_legend_handles_labels()
+
+    # Combine the handles and labels
+    handles = handles0 + handles0b
+    labels = labels0 + labels0b
+
+    # Create a single legend with the combined handles and labels
+    axes[4,0].legend(handles, labels, loc="upper left", frameon=False, fontsize=16)
+    #axes[4,0].legend(loc="upper right", frameon=False, fontsize=15)
+    
     
     #leg.set_in_layout(False)
 
@@ -444,7 +515,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
         ax.set_yticks(np.arange(-0.5, 4.5, 0.25), minor=True)
         ax.set_yticklabels([-1, -0.5, "LCL", 0.5, 1., 1.5], fontsize=20)
 
-    for ax in axes[:,0].flatten():
+    for ax in axes[:4,0].flatten():
         ax.set_xticks(np.arange(0, 24, 2))
         ax.set_xticks(np.arange(0, 24, 1), minor=True)
         ax.set_xticklabels(np.arange(0, 24, 2), fontsize=20)
@@ -484,7 +555,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
             ]
         )
 
-    axes[4,0].set_ylim([0, 0.07])
+    axes[4,0].set_ylim([500., 800.])
     axes[4,0].set_ylabel("Density [h$^{-1}$]", fontsize=25)
     axes[4,0].set_xlabel("Hour [LT, UTC-4]", fontsize=25)
     axes[4,1].set_xlabel("Hour [LT, UTC-4]", fontsize=25)
@@ -758,7 +829,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF):
 
     plt.savefig(
         os.path.join(
-            path_paper_plots, "diurnal.png"
+            path_paper_plots, "diurnal_v2.png"
         ),
     )
     
