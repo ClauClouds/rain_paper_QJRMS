@@ -20,7 +20,7 @@ from cloudtypes.cloudtypes import classify_region, cloud_mask_lcl_grid
 from readers.cloudtypes import read_cloudtypes
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
-
+from readers.lidars import read_and_map
 
 def main():
     
@@ -31,39 +31,33 @@ def main():
     """
     # read the trajectory patterns
     class_cloud_data = read_merian_classification()
-
-    """
-    Creates hydrometeor fraction profile
-    """
+    
+    #Creates hydrometeor fraction profile
     ds = prepare_data()
     dct_stats = statistics(ds)
 
     # defining domain 
     minlon = 6.; maxlon = 15.; minlat = -61; maxlat = -50.
     extent_param = [minlon, maxlon, minlat, maxlat]
+    font_size=25
+    font_titles=25
+    # creation of 4 single individual plots
     
-    # plot minutely ship position
-    # Create a figure with two subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 10))
-    fig = plt.figure(figsize=(16, 10))
-   
-
-    # Set the aspect ratio of both subplots to be equal
-    ax1.set_aspect('equal', adjustable='box')
-    ax2.set_aspect('equal', adjustable='box')
-    gs = fig.add_gridspec(1, 2, width_ratios=[1, 1])
-
-    ax2 = fig.add_subplot(gs[0, 1])
-    ax2.set_title("b) RV MSM trajectory during EUREC$^{4}$A", loc='left', fontweight='black')
-    ax2.set_xlim([0, 0.55])
-    ax2.set_yticks(np.arange(-1, 4.5, 1))
-    ax2.set_yticklabels([-1, "LCL", 1, 2, 3, 4])
-    ax2.set_ylim([-1, 4])
+    # plot of cloud fraction profiles for the different regions
+    fig, ax = plt.subplots(figsize=(8, 12))
     
-    font_size = 16
-    ax2.set_xlabel("Hydrometeor fraction",fontsize=font_size)
-    ax2.set_ylabel("Height above LCL [km]",fontsize=font_size)
-    plot_profiles_regions(ax2, 
+    ax.set_title("b) Hydrometeor fraction",
+                 loc='left', 
+                 fontsize=font_titles,
+                 fontweight='black')
+    ax.set_xlim([0, 0.55])
+    ax.set_yticks(np.arange(-1, 4.5, 1))
+    ax.set_yticklabels([-1, "LCL", 1, 2, 3, 4])
+    ax.tick_params(axis='both', which='major', labelsize=font_size)
+    ax.set_ylim([-1, 4])
+    ax.set_xlabel("Hydrometeor fraction",fontsize=font_size)
+    ax.set_ylabel("Height above LCL [km]",fontsize=font_size)
+    plot_profiles_regions(ax, 
                           hf_sh=dct_stats["hf_sh"],
                           hf_n_sh=dct_stats["hf_n_sh"], 
                           hf_t_sh=dct_stats["hf_t_sh"], 
@@ -73,27 +67,16 @@ def main():
                           hf_t_co=dct_stats["hf_t_co"], 
                           hf_s_co=dct_stats["hf_s_co"]
                           )
-
-    #ax1 = fig.add_subplot(gs[0, 0], projection=ccrs.PlateCarree())
-    ax1.set_title("a) Hydrometeor fraction for different regions", loc='left', fontweight='black')
-
-    # visualize trajectory
-    visualize_trajectory(fig, ax1, class_cloud_data, extent_param, hf=dct_stats["hf_all"])
     
-    ax1.grid(False) # remove grid
-    fig.tight_layout()
+    # save figure as png
+    fig.savefig('/work/plots_rain_paper/fig_1_b.png', 
+                dpi=300, 
+                bbox_inches='tight', 
+                transparent=True)
+    print('figure fig_1_b.png saved'    )
     
     
-    # saving figure as png
-    plt.savefig(
-        "/work/plots_rain_paper/fig_1_new.png",
-        dpi=300,
-        bbox_inches="tight",
-        transparent=True,
-    )
     plt.close()
-
-
 
 
 def prepare_data():
@@ -270,6 +253,7 @@ def visualize_trajectory(fig, ax, class_cloud_data, extent_param, hf):
     
         
     return(ax)
+
 
 def plot_profiles_regions(ax, 
                           hf_sh, 

@@ -1,8 +1,4 @@
 
-
-
-#%%
-    
 from readers.cloudtypes import read_merian_classification
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs                   # import projections
@@ -47,9 +43,9 @@ def visualize_trajectory(class_cloud_data, extent_param):
     cmap_track = 'plasma'
     
     # fontsizes
-    fs_grid = 10
-    fs_cbar_labels = 10
-    fs_track_labels = 10
+    fs_grid = 25
+    fs_cbar_labels = 25
+    fs_track_labels = 25
     
     # zorders
     zorder_land = 0
@@ -63,7 +59,7 @@ def visualize_trajectory(class_cloud_data, extent_param):
     sval = 20
     
     # plot minutely ship position
-    fig, ax = plt.subplots(1, 1, figsize=(8, 5), 
+    fig, ax = plt.subplots(figsize=(12,16), 
                            subplot_kw=dict(projection=ccrs.PlateCarree()))
     
     # set map extent
@@ -157,13 +153,16 @@ def visualize_trajectory(class_cloud_data, extent_param):
             marker='o', 
             s=sval) 
     
-    ax.legend(frameon=True)   
+    ax.legend(frameon=True, fontsize=fs_track_labels)   
     
-        
+    ax.set_title('a) RV MSM trajectory and mesoscale patterns',     
+            loc='left', 
+            fontsize=fs_track_labels,
+            fontweight='black')
     
     # saving figure as png
     plt.savefig(
-        "/work/plots_rain_paper/fig_trajectory.png",
+        "/work/plots_rain_paper/fig_1_a.png",
         dpi=300,
         bbox_inches="tight",
         transparent=True,

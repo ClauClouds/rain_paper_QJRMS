@@ -351,6 +351,9 @@ def f_closest(array,value):
 
 
 
+
+
+
 def f_clean_lidar_signal_from_noise_v1(data_path, dict_var, noise_mask_file='/net/ostro/4sibylle/diurnal_cycle_arthus/noise_mask.nc'):
     
     '''
@@ -451,6 +454,35 @@ def f_call_postprocessing_arthus(var_string):
     return(data)
 
 
+
+
+
+def read_and_map(var, str_instr='ARTHUS'):
+    """
+    read and postprocess variables from arthus and assign them lat/lon from ship data
+
+    Args:
+        str_instr (string): name of instrument (ARTHUS)
+        var (string): string short name of the variable (options are T, MR, VW)
+    """
+    from readers.lidars import f_read_merian_data
+    from readers.ship import read_ship
+    
+    # read arthus data
+    data, dates = f_read_merian_data(str_instr, var)
+
+    # read ship data
+    ship_data = read_ship()
+    
+    # select ship data for the time stamps of arthus
+    ship_data = ship_data.sel(time=data.Time.values, method='nearest')
+    
+    # redefine values of Latitude variable in data
+    data = data.assign_coords(Latitude = ship_data.lat.values)
+    #refedine values of Longitude variable in data
+    data = data.assign_coords(Longitude = ship_data.lon.values)
+
+    return(data)
 
 
  
