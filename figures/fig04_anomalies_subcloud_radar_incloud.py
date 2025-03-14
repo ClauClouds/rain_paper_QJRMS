@@ -96,7 +96,7 @@ def main():
 
     # plot figure of anomalies of vertical velocity, specific humidity and virtual potential temperature
     # Example usage
-    plot_multipanel_figure(lcl_dc,
+    plot_multipanel_figure_V2(lcl_dc,
                            dct_stats, 
                            ds_sl_prec, 
                            ds_sl_nonprec, 
@@ -1184,7 +1184,261 @@ def f_plot_datarray(da, x, y, var_name):
 
 
 
+
+
+
+# Example function to plot and save figures
+def plot_multipanel_figure_V2(lcl_dc, 
+                           ds_stats,
+                           ds_sl_prec, 
+                           ds_sl_nonprec, 
+                           ds_cg_prec,
+                           ds_cg_nonprec, 
+                           ds_q_sl_prec, 
+                           ds_q_sl_nonprec, 
+                           ds_q_cg_prec, 
+                           ds_q_cg_nonprec,
+                           ds_q_clear, 
+                           ds_theta_v_sl_prec, 
+                           ds_theta_v_sl_nonprec, 
+                           ds_theta_v_cg_prec, 
+                           ds_theta_v_cg_nonprec,
+                           ds_theta_v_clear, 
+                           ds_cb_sllcl,
+                           ds_cb_cglcl,
+                           ds_sl_prec_hw,
+                           ds_sl_nonprec_hw,
+                           ds_cg_prec_hw,
+                           ds_cg_nonprec_hw,
+                           data):
+    
+    # Set the default font size for all elements
+    plt.rcParams.update({'font.size': 12})
+    
+    # read relative occurrences of cloud types
+    rel_occ_co_r_diurnal=ds_stats["rel_occ_co_r_diurnal"]
+    rel_occ_co_nr_diurnal=ds_stats["rel_occ_co_nr_diurnal"]
+    rel_occ_sh_diurnal=ds_stats["rel_occ_sh_diurnal"]
+    rel_occ_co_diurnal=ds_stats["rel_occ_co_diurnal"]
+    
+    # convert rel_occ_co_diurnal.hour into a datetime object
+    time_rel_occ = create_time(rel_occ_co_diurnal.hour.values, 3, 2025, '11')
+    
+    bins = np.arange(-0.5, 1.75,0.25)
+    bin_width = bins[1] - bins[0]
+
+    hist_shallow, bins_shallow = np.histogram(ds_cb_sllcl, bins=bins, density=True)
+    hist_congestus, bins_congestus = np.histogram(ds_cb_cglcl, bins=bins, density=True)
+    
+    # Adjust bin coordinates
+    bins_shallow_centered = bins_shallow[:-1] + bin_width / 2
+    bins_congestus_centered = bins_congestus[:-1] + bin_width / 2
+    
+    
+    # selecting radar moments for the plot for shallow and congestus clouds
+    ze_s = data.ze_shallow.values.flatten()
+    ze_c = data.ze_congestus.values.flatten()
+    vd_s = data.vd_shallow.values.flatten()
+    vd_c = data.vd_congestus.values.flatten()
+    sk_s = data.sk_shallow.values.flatten()
+    sk_c = data.sk_congestus.values.flatten()
+    
+    # selecting values different from nans in all variables for shallow and congestus clouds
+    i_good_s = ~np.isnan(ze_s) * ~np.isnan(vd_s) * ~np.isnan(sk_s)
+    i_good_c = ~np.isnan(ze_c) * ~np.isnan(vd_c) * ~np.isnan(sk_c)
+    ze_s = ze_s[i_good_s]
+    vd_s = vd_s[i_good_s]
+    sk_s = sk_s[i_good_s]
+    ze_c = ze_c[i_good_c]
+    vd_c = vd_c[i_good_c]
+    sk_c = sk_c[i_good_c]
+    
+    # calculating 2d histograms to plot
+    hist_ZESK_cloud_s, x_ze_cloud_s, y_sk_cloud_s = np.histogram2d(ze_s, 
+                                                                   sk_s, 
+                                                                   bins=[40, 40], 
+                                                                   range=[[-50., 25.],
+                                                                          [-1., 1.]], 
+                                                                   density=True)
+    hist_ZEVD_cloud_s, x_ze2_cloud_s, y_vd_cloud_s = np.histogram2d(ze_s, vd_s, 
+                                                                    bins=[40, 40], 
+                                                                    range=[[-50., 25.],
+                                                                           [-4., 2.]], 
+                                                                    density=True)
+
+    
+    
+    # Create a figure
+    fig = plt.figure(figsize=(15, 15))
+    
+    # set all fonts in the figure to 25
+    plt.rcParams.update({'font.size': 25})
+    
+    # Create a GridSpec with 3 rows and 2 columns
+    subplots = plt.subplots()
+    gs = subplots[0].add_gridspec(2, 6, height_ratios=[3, 4], width_ratios=[2, 2, 2, 2, 2, 2])
+    #gs.subplots_adjust(hspace=0.3)
+    # Add subplots with different sizes
+    
+    # cloud base height distributions
+    ax1 = fig.add_subplot(gs[0, 0:2])  # Second row, first column, profiles of w
+    ax1.plot(hist_shallow, bins_shallow_centered, color=COLOR_SHALLOW, linewidth=2)
+    ax1.plot(hist_congestus, bins_congestus_centered, color=COLOR_CONGESTUS, linewidth=2)
+    ax1.fill_betweenx(bins_shallow_centered, 0., hist_shallow, color=COLOR_SHALLOW, alpha=0.5)
+    ax1.fill_betweenx(bins_congestus_centered, 0., hist_congestus, color=COLOR_CONGESTUS, alpha=0.5)
+    ax1.set_ylim(-0.5, 1.5)
+    ax1.set_yticks(np.arange(-0.5, 1.5, 0.25), minor=True)
+    ax1.set_yticklabels([-0.5, -0.25, "LCL", 0.25, 0.5, 1, 1.25, 1.5])
+    ax1.set_ylabel("Height above\nLCL [km]")
+    ax1.set_xlabel("Norm. Occ.")
+    ax1.set_title(" a) CB distribution", loc='left', fontweight='black')
+    
+    # profiles of w
+    ax2 = fig.add_subplot(gs[0, 2])  # Second row, first column, profiles of w
+    plot_profiles(ax2, 
+                  ds_sl_prec, 
+                  ds_sl_nonprec, 
+                  ds_cg_prec,
+                  ds_cg_nonprec,
+                  -0.4, 0.4, 'w anomaly [m/s]')
+    ax2.set_title('b) w anomaly', loc='left', fontweight='black')
+
+    ax2bis = fig.add_subplot(gs[0, 3])  # Second row, first column, profiles of w
+    plot_profiles(ax2bis, 
+                  ds_sl_prec_hw, 
+                  ds_sl_nonprec_hw, 
+                  ds_cg_prec_hw,
+                  ds_cg_nonprec_hw,
+                  -1, 1, 'H wind anomaly [m/s]')
+    ax2bis.set_title('c) Hspeed \n anomaly', loc='left', fontweight='black')
+
+    # profiles of q
+    ax3 = fig.add_subplot(gs[0, 4], sharey=ax2)  # Second row, second column profiles of q
+    plot_profiles(ax3, 
+                  ds_q_sl_prec, 
+                  ds_q_sl_nonprec, 
+                  ds_q_cg_prec, 
+                  ds_q_cg_nonprec, 
+                  10, 16.5, 'q [g/kg]')
+    ax3.plot(ds_q_clear.mean("time"),
+             ds_q_clear.height* 1e-3,
+             label='clear sky',
+             color='black', 
+             linewidth=3, 
+             linestyle = 'dashdot')
+
+    ax3.set_title('d) spec. \n humidity', loc='left', fontweight='black')
+
+ 
+    # profiles of theta_v
+    ax4 = fig.add_subplot(gs[0, 5], sharey=ax2)  # Second row, third column profiles of thetav
+    plot_profiles(ax4, 
+                  ds_theta_v_sl_prec, 
+                  ds_theta_v_sl_nonprec, 
+                  ds_theta_v_cg_prec, 
+                  ds_theta_v_cg_nonprec, 
+                  300, 310, '$\Theta_v$[K]')
+    ax4.plot(ds_theta_v_clear.mean("time"),
+             ds_theta_v_clear.height* 1e-3,
+             label='clear sky',
+             color='black', 
+             linewidth=3, 
+             linestyle = 'dashdot')
+    ax4.set_title('e) Virt. pot. \n temp.', loc='left', fontweight='black')
+
+    # Generate the legend from ax4
+    handles, labels = ax4.get_legend_handles_labels()
+    ax1.legend(handles, labels, loc='center', frameon=False, ncol=5, bbox_to_anchor=(-0.7, 1.15))
+
+    # scatter Ze vs Vd
+    ax5 = fig.add_subplot(gs[1, 0:3])  # Third row, left plot
+    ax5.set_title('f) Normalized Occurrences of Ze vs Vd', loc='left', fontweight='black')
+
+    hist_d = ax5.hist2d(ze_c, 
+                        vd_c, 
+                        bins=(40, 40), 
+                        range=([-50., 25.],[-4., 2.]), 
+                        cmap=CMAP, 
+                        density=True, 
+                        cmin=0.0001)
+    
+    cbar = fig.colorbar(hist_d[3], ax=ax5, orientation='horizontal')
+    cs = ax5.contour(x_ze2_cloud_s[:-1], 
+                        y_vd_cloud_s[:-1], 
+                        hist_ZEVD_cloud_s.T, 
+                        np.arange(np.nanmin(hist_ZEVD_cloud_s),
+                                np.nanmax(hist_ZEVD_cloud_s), 
+                                (np.nanmax(hist_ZEVD_cloud_s)- np.nanmin(hist_ZEVD_cloud_s))/10), 
+                        cmap=plt.cm.Greys)
+    ax5.clabel(cs, inline=True)
+    cbar.set_label('norm. occ. congestus clouds')
+    #cbar.ax.tick_params(labelsize=25)
+    ax5.set_ylabel("Mean Doppler velocity [ms$^{-1}$] ")
+    ax5.set_xlabel("Reflectivity [dBz] ")
+    ax5.set_ylim(-4., 2.)
+    ax5.set_xlim(-50.,25.)
+    
+    # scatter Ze vs Sk
+
+    ax6 = fig.add_subplot(gs[1, 3:])  # Third row, right plot
+    ax6.set_title('g) Normalized Occurrences of Ze vs Sk', loc='left', fontweight='black')
+
+    hist_d = ax6.hist2d(ze_c, 
+                        -sk_c, 
+                        bins=(40, 40), 
+                        range=([-50., 25.],[-1., 1.]), 
+                        cmap=CMAP, 
+                        density=True, 
+                        cmin=0.0001)
+    cbar = fig.colorbar(hist_d[3], ax=ax6, orientation='horizontal')
+    cs = ax6.contour(x_ze_cloud_s[:-1], 
+                        -y_sk_cloud_s[:-1], 
+                        hist_ZESK_cloud_s.T, 
+                        np.arange(np.nanmin(hist_ZESK_cloud_s), np.nanmax(hist_ZESK_cloud_s),
+                                (np.nanmax(hist_ZESK_cloud_s)- np.nanmin(hist_ZESK_cloud_s))/10),
+                        cmap=plt.cm.Greys)
+    
+    ax6.clabel(cs, inline=True)
+    cbar.set_label('norm. occ. congestus clouds')
+    #cbar.ax.tick_params(labelsize=25)
+    ax6.set_ylabel("Skewness ")
+    ax6.set_xlabel("Reflectivity [dBz] ")
+    ax6.set_ylim(-1., 1.)
+    ax6.set_xlim(-50.,25.)
+    
+    for ax in [ax1, ax2, ax2bis, ax3, ax4, ax5, ax6]:  # Loop over all axes    
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["bottom"].set_linewidth(2)
+        ax.spines["left"].set_linewidth(2)
+        ax.xaxis.set_minor_locator(ticker.AutoMinorLocator(n=5))
+        ax.tick_params(which='minor', length=3, width=2)
+        ax.tick_params(which='major', length=5, width=2)
+        ax.get_xaxis().tick_bottom()
+        ax.get_yaxis().tick_left()
+    
+    # Adjust layout
+    gs.tight_layout(fig, h_pad=1.0, w_pad=1.0)
+
+    fig.subplots_adjust(hspace=0.4, wspace=0.4)
+
+    
+    # Save the figure to a file
+    fig.savefig('/net/ostro/plots_rain_paper/fig_04_multipanel_figure_new_V2.png')
+
+
+
+
+
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
 
 
