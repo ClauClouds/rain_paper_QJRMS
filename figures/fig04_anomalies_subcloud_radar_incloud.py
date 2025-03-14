@@ -1212,8 +1212,6 @@ def plot_multipanel_figure_V2(lcl_dc,
                            ds_cg_nonprec_hw,
                            data):
     
-    # Set the default font size for all elements
-    plt.rcParams.update({'font.size': 12})
     
     # read relative occurrences of cloud types
     rel_occ_co_r_diurnal=ds_stats["rel_occ_co_r_diurnal"]
@@ -1269,14 +1267,14 @@ def plot_multipanel_figure_V2(lcl_dc,
     
     
     # Create a figure
-    fig = plt.figure(figsize=(15, 15))
+    fig = plt.figure(figsize=(22, 18))
     
-    # set all fonts in the figure to 25
-    plt.rcParams.update({'font.size': 25})
+    # set all fonts in the figure to 20
+    plt.rcParams.update({'font.size': 18})
     
     # Create a GridSpec with 3 rows and 2 columns
     subplots = plt.subplots()
-    gs = subplots[0].add_gridspec(2, 6, height_ratios=[3, 4], width_ratios=[2, 2, 2, 2, 2, 2])
+    gs = subplots[0].add_gridspec(2, 6, height_ratios=[3, 4]) #, width_ratios=[2, 2, 2, 2, 2, 2]
     #gs.subplots_adjust(hspace=0.3)
     # Add subplots with different sizes
     
@@ -1301,7 +1299,7 @@ def plot_multipanel_figure_V2(lcl_dc,
                   ds_cg_prec,
                   ds_cg_nonprec,
                   -0.4, 0.4, 'w anomaly [m/s]')
-    ax2.set_title('b) w anomaly', loc='left', fontweight='black')
+    ax2.set_title('b) W anomaly', loc='left', fontweight='black')
 
     ax2bis = fig.add_subplot(gs[0, 3])  # Second row, first column, profiles of w
     plot_profiles(ax2bis, 
@@ -1327,7 +1325,7 @@ def plot_multipanel_figure_V2(lcl_dc,
              linewidth=3, 
              linestyle = 'dashdot')
 
-    ax3.set_title('d) spec. \n humidity', loc='left', fontweight='black')
+    ax3.set_title('d) Spec. \n humidity', loc='left', fontweight='black')
 
  
     # profiles of theta_v
@@ -1348,7 +1346,7 @@ def plot_multipanel_figure_V2(lcl_dc,
 
     # Generate the legend from ax4
     handles, labels = ax4.get_legend_handles_labels()
-    ax1.legend(handles, labels, loc='center', frameon=False, ncol=5, bbox_to_anchor=(-0.7, 1.15))
+    ax2.legend(handles, labels, loc='center', frameon=False, ncol=5, bbox_to_anchor=(0.5, 1.15))
 
     # scatter Ze vs Vd
     ax5 = fig.add_subplot(gs[1, 0:3])  # Third row, left plot
@@ -1418,9 +1416,9 @@ def plot_multipanel_figure_V2(lcl_dc,
         ax.get_yaxis().tick_left()
     
     # Adjust layout
-    gs.tight_layout(fig, h_pad=1.0, w_pad=1.0)
+    #gs.tight_layout(fig, h_pad=1.0, w_pad=1.0)
 
-    fig.subplots_adjust(hspace=0.4, wspace=0.4)
+    fig.subplots_adjust(hspace=0.2, wspace=0.5)
 
     
     # Save the figure to a file
