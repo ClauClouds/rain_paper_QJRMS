@@ -504,9 +504,9 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF, lcl_dc):
     labels = labels0 + labels0b
 
     # Create a single legend with the combined handles and labels
-    axes[4,0].legend(handles, labels, loc="upper left", frameon=False, fontsize=16)
+    axes[4,0].legend(handles, labels, loc="upper left", frameon=False, ncol=3, fontsize=16)
     #axes[4,0].legend(loc="upper right", frameon=False, fontsize=15)
-    
+
     
     #leg.set_in_layout(False)
 
@@ -556,7 +556,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF, lcl_dc):
         )
 
     axes[4,0].set_ylim([500., 800.])
-    axes[4,0].set_ylabel("Density [h$^{-1}$]", fontsize=25)
+    axes[4,0].set_ylabel("Height [m]", fontsize=25)
     axes[4,0].set_xlabel("Hour [LT, UTC-4]", fontsize=25)
     axes[4,1].set_xlabel("Hour [LT, UTC-4]", fontsize=25)
 
@@ -614,6 +614,7 @@ def plot_diurnal(dct_stats, da_T, da_MR, da_HW, da_LF, da_SF, lcl_dc):
         im_co_nr,
         ax=axes[:4,0],
         ticks=np.arange(0, 1.1, 0.1),
+        pad=0.02,
     )
     cbar_hf.set_label("Hydrometeor fraction",fontsize=20)
     cbar_hf.ax.tick_params(labelsize=20)  
