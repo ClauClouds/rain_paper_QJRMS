@@ -151,9 +151,9 @@ def plot_profile_diff(ds_rs, var, var_rs, var_arthus):
         ax[0].set_ylabel('Height (m)')
         ax[1].set_ylabel('Height (m)')
         ax[0].set_xlim(-5, 5)
-        ax[0].set_ylim(0, 4000)
+        ax[0].set_ylim(250, 2000)
         ax[1].set_xlim(-5, 5)
-        ax[1].set_ylim(0, 4000)
+        ax[1].set_ylim(250, 2000)
         var_string='T'
     elif var == 'MR':
         ax[0].set_xlabel('RS mixing ratio - lidar mixing ratio (g/kg)')
@@ -161,9 +161,9 @@ def plot_profile_diff(ds_rs, var, var_rs, var_arthus):
         ax[0].set_ylabel('Height (m)')
         ax[1].set_ylabel('Height (m)')
         ax[0].set_xlim(-5, 5)
-        ax[0].set_ylim(0, 4000)
+        ax[0].set_ylim(250, 4000)
         ax[1].set_xlim(-5, 5)
-        ax[1].set_ylim(0, 4000)
+        ax[1].set_ylim(250, 4000)
         var_string='MR'
     ax[0].grid()
     ax[1].grid()
