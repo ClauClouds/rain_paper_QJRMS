@@ -94,11 +94,11 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     
     
     # set all fonts to 20
-    rcParams.update({'font.size': 25})
-    rcParams.update({'axes.labelsize': 25})
-    rcParams.update({'xtick.labelsize': 20})
-    rcParams.update({'ytick.labelsize': 20})
-    rcParams.update({'legend.fontsize': 20})
+    rcParams.update({'font.size': 30})
+    rcParams.update({'axes.labelsize': 30})
+    rcParams.update({'xtick.labelsize': 30})
+    rcParams.update({'ytick.labelsize': 30})
+    rcParams.update({'legend.fontsize': 30})
 
     # set y axis labels size
     # define timestamps useful for plotting
@@ -155,8 +155,8 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     lines, labels = ax0.get_legend_handles_labels()
     lines2, labels2 = ax00.get_legend_handles_labels()
     ax00.legend(lines + lines2, labels + labels2, loc='upper right', frameon=False)
-    ax0.set_ylabel('LWP [g m$^{-2}$]', fontsize=18) 
-    ax00.set_ylabel('Rain rate at 500 m [mmh$^{-1}$]', fontsize=18)
+    ax0.set_ylabel('LWP [g m$^{-2}$]', fontsize=25) 
+    ax00.set_ylabel('Rain rate at 500 m [mmh$^{-1}$]', fontsize=25)
     
     
     # second subplot: mixing ratio anomaly
@@ -172,7 +172,7 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     cbar = fig.colorbar(mesh00, ax=ax1, orientation='vertical', aspect=10, pad=0.005)
     cbar.set_label('Anomaly \n Mixing Ratio [g kg$^{-1}$]', fontsize=25)
     cbar.ax.tick_params(labelsize=25)   
-    ax1.set_ylabel('Height [m]', fontsize=18)  
+    ax1.set_ylabel('Height [m]', fontsize=25)  
     ax1.vlines(time_5, 50, 600., color=color_5, linewidth=8, linestyle=':')
     ax1.vlines(time_2, 50, 600., color=color_2, linewidth=8, linestyle=':')
     
@@ -189,7 +189,7 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     cbar.set_label('Horizontal \n wind speed [m s$^{-1}$]', fontsize=25)
     cbar.ax.tick_params(labelsize=25)    
     ax2.set_ylim(250., 700.)  
-    ax2.set_ylabel('Height [m]', fontsize=18)  
+    ax2.set_ylabel('Height [m]', fontsize=25)  
     ax2.vlines(time_5, 50, 600., color=color_5, linewidth=8, linestyle=':')
     ax2.vlines(time_2, 50, 600., color=color_2, linewidth=8, linestyle=':')
     
@@ -210,7 +210,7 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
                         color='black', 
                         label='radar weather station')   
     ax3.set_ylim(50., 90.)  
-    ax3.legend(frameon=False, loc='lower right', fontsize=18)
+    ax3.legend(frameon=False, loc='lower right', fontsize=25)
     ax3.vlines(time_5, 50, 90., color=color_5, linewidth=8, linestyle=':')
     ax3.vlines(time_2, 50, 90., color=color_2, linewidth=8, linestyle=':')
 
@@ -229,7 +229,7 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
                         linewidth=7,
                         color='black', 
                         label='radar weather station') 
-    ax4.legend(frameon=False, loc='lower right', fontsize=18)
+    ax4.legend(frameon=False, loc='lower right', fontsize=25)
     ax4.vlines(time_5, 297, 302., color=color_5, linewidth=8, linestyle=':')
     ax4.vlines(time_2,297, 302., color=color_2, linewidth=8, linestyle=':')
     ax4.set_ylim(297., 302.)  
@@ -267,7 +267,7 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     ax5.set_xlabel('Time [hh:mm]', fontsize=25)  
 
 
-    for ax, l in zip([ax0,ax1,ax2,ax3,ax4,ax5], ['a) LWP [g m$^{-2}$] and Rain rate at 500 m [mmh$^{-1}$]', 'b) Mixing ratio anomaly ',  'c) Horizontal wind speed [m s$^{-1}$]', 'd) Surface relative humidity [%]','e) Surface air temperature [C]', 'f) Satellite class.']):
+    for ax, l in zip([ax0,ax1,ax2,ax3,ax4,ax5], ['a) LWP [g m$^{-2}$] and Rain rate at 500 m [mmh$^{-1}$]', 'b) Mixing ratio anomaly ',  'c) Horizontal wind speed [m s$^{-1}$]', 'd) Surface relative humidity [%]','e) Surface air temperature [K]', 'f) Satellite class.']):
                                                    
         ax.text(-0.05, 1.07, l,  fontweight='black', fontsize=25, transform=ax.transAxes)
         ax.spines["top"].set_visible(False)

@@ -1,0 +1,83 @@
+import xarray as xr
+import numpy as np
+import pandas as pd
+from pathlib import Path
+import glob
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+import matplotlib
+from datetime import datetime, timedelta
+import matplotlib.dates as mdates
+from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
+import matplotlib.ticker as ticker
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+from warnings import warn
+import datetime as dt
+from scipy import interpolate
+import matplotlib as mpl
+import os.path
+import itertools
+import os.path
+from matplotlib import pyplot as plt, dates
+from figures.mpl_style import CMAP, CMAP_an
+from PIL import Image, ImageDraw
+from matplotlib.gridspec import GridSpec
+
+from readers.ship import read_ship
+from readers.lidars import read_mrr_given_day, read_Hwind_speeds, extract_halo_cell_profiles
+from readers.radar import read_lwp, read_radar_single_file
+from readers.sat_data import read_satellite_classification
+from readers.lidars import read_anomalies
+
+
+# setting case study time information
+date = '20200212'
+yy = '2020'
+mm = '02'
+dd = '12'
+#time_start = datetime(2020, 2, 12, 16, 15, 0)
+#time_end = datetime(2020, 2, 12, 16, 40, 0)
+time_start = datetime(2020, 2, 12, 11, 0, 0)
+time_end = datetime(2020, 2, 12, 19, 0, 0)
+time_transition =  datetime(2020, 2, 12, 15, 0, 0)
+
+# read input data
+ship_data = read_ship()
+LWP_IWV_data = read_lwp()
+radarData = read_radar_single_file(yy,mm,dd)
+MRR_data = read_mrr_given_day(yy,mm,dd)
+H_wind_speed_data = read_Hwind_speeds()
+
+# read mixing ratio anomalies
+MR_anomaly = read_anomalies('MR')
+
+
+
+# setting up the figure
+fig = plt.figure(figsize=(12, 8))
+
+# plot horizontal bar from time_start to time_transition
+gs = GridSpec(1, 1, figure=fig)
+ax = fig.add_subplot(gs[0, 0])
+ax.barh(5, 
+        time_transition-time_start, 
+        height=1, 
+        left=time_start, 
+        color='lightgrey', 
+        edgecolor='black', 
+        linewidth=1.5)
+
+# plot horizontal bar from time_transition to time_end
+ax.barh(5, 
+        time_end-time_transition, 
+        height=1, 
+        left=time_transition, 
+        color='lightblue', 
+        edgecolor='black', 
+        linewidth=1.5)
+ax.set_xlim(time_start, time_end)
+ax.set_ylim(0, 7)
+
+#save figure
+plt.savefig('/net/ostro/plots_rain_paper/test_barh.png', dpi=300, bbox_inches='tight')
