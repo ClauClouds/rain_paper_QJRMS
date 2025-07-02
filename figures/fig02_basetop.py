@@ -31,9 +31,12 @@ def main():
     """
 
     ds = prepare_data()
+    
+    t_test_cb_ct(ds)
 
     da_hist = statistics(ds)
 
+    
 
     # read MWR data
     merian = read_lwp() 
@@ -57,6 +60,15 @@ def main():
     #plot_histogram(da_hist=da_hist)
     plot_figure2(da_hist, merian, shallow, congestus, cloudyflag)
     
+    # calculate mean LWP shallow and mean LWP congestus
+    mean_lwp_shallow = np.nanmean(merian.lwp[shallow & cloudyflag])
+    mean_lwp_congestus = np.nanmean(merian.lwp[congestus & cloudyflag])
+    print(f"Mean LWP shallow: {mean_lwp_shallow:.2f} g/m^2")
+    print(f"Mean LWP congestus: {mean_lwp_congestus:.2f} g/m^2")
+    print(f"Number of shallow clouds: {np.sum(shallow & cloudyflag)}")
+    print(f"Number of congestus clouds: {np.sum(congestus & cloudyflag)}")
+    
+   
 def plot_figure2(da_hist, merian, shallow, congestus, cloudyflag):
     
     # deriving cumulative histogram of cloudy, non-precipitating LWP as function of shallow/congestus
@@ -66,7 +78,15 @@ def plot_figure2(da_hist, merian, shallow, congestus, cloudyflag):
     # selecting indeces of shallow/congestus 
     indexinds = (cloudyflag == 1) & (~np.isnan(merian.lwp))
     
-    
+    from scipy.stats import ttest_ind
+    t_stat, p_value = ttest_ind(merian.lwp[shallow & indexinds], merian.lwp[congestus & indexinds], equal_var=False)
+    print(p_value)
+    alpha = 0.05  # significance level
+    if p_value < alpha:
+        print(f"The difference in rain rates is statistically significant (p-value: {p_value:.20f})")
+    else:
+        print(f"The difference in rain rates is not statistically significant (p-value: {p_value:.8f})")
+        
     
     # constructing figure 2
     fig, ax = plt.subplots(1, 2, figsize=(12, 4))

@@ -3,17 +3,24 @@ histograms of virga depths and rain rate for shallow and congestus clouds
 
 """
 
-from readers.wband import read_radar_multiple
+from readers.radar import read_radar_multiple, get_radar_files
 from readers.cloudtypes import read_rain_flags, read_cloud_class
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 import os
+import pdb
 
 def main():
     
     # reading wband radar data to get rain rate from surface weather station in the radar
-    wband_data = read_radar_multiple()
+    files = get_radar_files()
+
+    wband_data = xr.open_mfdataset(files)
+    #wband_data = read_radar_multiple()  # uncomment this line if you want to use the function directly 
+
+        
+    #wband_data = read_radar_multiple()
     
     # read cloud classification
     all_flags = read_rain_flags()
@@ -44,6 +51,26 @@ def main():
     ind_deep_r = np.where((rain.shape.values == 1))[0]
     rain_shallow = rain.isel(time=ind_shallow_r)
     rain_deep = rain.isel(time=ind_deep_r)    
+    
+    
+    # calculating t-test for the distributions of rain rate for shallow and congestus cases
+    
+    from scipy.stats import ttest_ind
+    t_stat, p_value = ttest_ind(rain_shallow.rain_rate.values, rain_deep.rain_rate.values, equal_var=False)
+    print(p_value)
+    alpha = 0.05  # significance level
+    if p_value < alpha:
+        print(f"The difference in rain rates is statistically significant (p-value: {p_value:.20f})")
+    else:
+        print(f"The difference in rain rates is not statistically significant (p-value: {p_value:.8f})")
+        
+    
+    # print mean rain rate in shallow and in deep cases
+    
+    mean_rr_shallow = np.nanmean(rain_shallow.rain_rate.values) 
+    mean_rr_deep = np.nanmean(rain_deep.rain_rate.values)
+    print(f"Mean rain rate shallow: {mean_rr_shallow:.2f} mm/h")
+    print(f"Mean rain rate deep: {mean_rr_deep:.2f} mm/h")
     
 
     #set all zero values to nan so it does not appear in the histogram
