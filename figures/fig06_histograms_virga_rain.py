@@ -10,6 +10,8 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import os
 import pdb
+from fig_rev_mean_values_table import man_withney_u_test
+
 
 def main():
     
@@ -52,25 +54,35 @@ def main():
     rain_shallow = rain.isel(time=ind_shallow_r)
     rain_deep = rain.isel(time=ind_deep_r)    
     
+    rain_shallow = rain_shallow.where(rain_shallow.rain_rate > 0)
+    rain_deep = rain_deep.where(rain_deep.rain_rate > 0)
     
+    # call the function to do the Mann-Whitney U test
+    alpha=0.05
+    man_withney_u_test(rain_shallow, rain_deep, "rain rate", alpha)
+
     # calculating t-test for the distributions of rain rate for shallow and congestus cases
     
-    from scipy.stats import ttest_ind
-    t_stat, p_value = ttest_ind(rain_shallow.rain_rate.values, rain_deep.rain_rate.values, equal_var=False)
-    print(p_value)
-    alpha = 0.05  # significance level
-    if p_value < alpha:
-        print(f"The difference in rain rates is statistically significant (p-value: {p_value:.20f})")
-    else:
-        print(f"The difference in rain rates is not statistically significant (p-value: {p_value:.8f})")
-        
     
     # print mean rain rate in shallow and in deep cases
+    # remove rain rates values equal to 0
+    rain_shallow = rain_shallow.where(rain_shallow.rain_rate > 0)
+    rain_deep = rain_deep.where(rain_deep.rain_rate > 0)
     
     mean_rr_shallow = np.nanmean(rain_shallow.rain_rate.values) 
     mean_rr_deep = np.nanmean(rain_deep.rain_rate.values)
     print(f"Mean rain rate shallow: {mean_rr_shallow:.2f} mm/h")
     print(f"Mean rain rate deep: {mean_rr_deep:.2f} mm/h")
+    
+    # print std and percentiles of rain rates
+    std_rr_shallow = np.nanstd(rain_shallow.rain_rate.values)
+    std_rr_deep = np.nanstd(rain_deep.rain_rate.values)
+    percentiles_rr_shallow = np.nanpercentile(rain_shallow.rain_rate.values, [0, 10, 50, 90, 100])
+    percentiles_rr_deep = np.nanpercentile(rain_deep.rain_rate.values, [0, 10, 50, 90, 100])
+    print(f"Std rain rate shallow: {std_rr_shallow:.2f} mm/h")
+    print(f"Std rain rate deep: {std_rr_deep:.2f} mm/h")
+    print(f"Percentiles rain rate shallow: {percentiles_rr_shallow}")
+    print(f"Percentiles rain rate deep: {percentiles_rr_deep}")
     
 
     #set all zero values to nan so it does not appear in the histogram

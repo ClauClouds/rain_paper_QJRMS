@@ -12,6 +12,8 @@ import numpy as np
 import xarray as xr
 #from dotenv import load_dotenv
 from mpl_style import CMAP, COLOR_CONGESTUS, COLOR_SHALLOW  
+from fig_rev_mean_values_table import man_withney_u_test
+
 
 # add parent directory to path
 sys.path.insert(
@@ -32,11 +34,8 @@ def main():
 
     ds = prepare_data()
     
-    t_test_cb_ct(ds)
-
     da_hist = statistics(ds)
 
-    
 
     # read MWR data
     merian = read_lwp() 
@@ -68,7 +67,31 @@ def main():
     print(f"Number of shallow clouds: {np.sum(shallow & cloudyflag)}")
     print(f"Number of congestus clouds: {np.sum(congestus & cloudyflag)}")
     
-   
+    # LWP std and percentiles
+    std_lwp_shallow = np.nanstd(merian.lwp[shallow & cloudyflag])
+    std_lwp_congestus = np.nanstd(merian.lwp[congestus & cloudyflag])
+    percentiles_lwp_shallow = np.nanpercentile(merian.lwp[shallow & cloudyflag], [0, 10, 50, 90, 100])
+    percentiles_lwp_congestus = np.nanpercentile(merian.lwp[congestus & cloudyflag], [0, 10, 50, 90, 100])
+    
+    lwp_congestus = merian.lwp[congestus & cloudyflag]
+    lwp_shallow = merian.lwp[shallow & cloudyflag]
+    
+    # select non nan values
+    lwp_congestus = lwp_congestus[~np.isnan(lwp_congestus)]
+    lwp_shallow = lwp_shallow[~np.isnan(lwp_shallow)]
+    
+    
+    print(f"Std LWP shallow: {std_lwp_shallow:.2f} g/m^2")
+    print(f"Std LWP congestus: {std_lwp_congestus:.2f} g/m^2")
+    print(f"Percentiles LWP shallow: {percentiles_lwp_shallow}")
+    print(f"Percentiles LWP congestus: {percentiles_lwp_congestus}")
+    
+    
+    # run mann-whitney U test for cloud base and cloud top
+    alpha=0.05
+    man_withney_u_test(lwp_congestus, lwp_shallow, "LWP", alpha)
+
+
 def plot_figure2(da_hist, merian, shallow, congestus, cloudyflag):
     
     # deriving cumulative histogram of cloudy, non-precipitating LWP as function of shallow/congestus
