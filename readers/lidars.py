@@ -477,10 +477,21 @@ def read_and_map(var, str_instr='ARTHUS'):
     # select ship data for the time stamps of arthus
     ship_data = ship_data.sel(time=data.Time.values, method='nearest')
     
-    # redefine values of Latitude variable in data
-    data = data.assign_coords(Latitude = ship_data.lat.values)
+    # add variables to data 
+    # Method 3: Add multiple variables at once
+    new_vars = {
+        'ship_latitude': (['Time'], ship_data.lat.values),
+        'ship_longitude': (['Time'], ship_data.lon.values),
+    }
+    data = data.assign(**new_vars)
+    
+    # redefine values of Latitude variable in data with dimensions (time)
+    #data = data.assign_coords(Latitude = ship_data.lat.values)
+    # redefine values of Longitude variable in data with dimensions (time)
+
+    
     #refedine values of Longitude variable in data
-    data = data.assign_coords(Longitude = ship_data.lon.values)
+    #data = data.assign_coords(Longitude = ship_data.lon.values)
 
     return(data)
 
