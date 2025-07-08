@@ -93,6 +93,12 @@ def prepare_anomaly_profiles(cloud_properties, var_string):
     mean_nr_d = data_no_rain_deep.mean(dim='time')
     std_nr_d = data_no_rain_deep.std(dim = 'time')
         
+    #print number of profiles averaged for each shallow non rainy and congestus non rainy
+    print(f"Number of non rainy shallow profiles: {data_no_rain_shallow.time.size}")
+    print(f"Number of non rainy congestus profiles: {data_no_rain_deep.time.size}")
+    print(f"Number of rainy shallow profiles: {data_rain_shallow.time.size}")
+    print(f"Number of rainy congestus profiles: {data_rain_deep.time.size}")
+    
     # create dataset for output
     output_dataset = xr.Dataset(
         data_vars = {
