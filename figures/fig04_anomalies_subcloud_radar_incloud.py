@@ -669,10 +669,10 @@ def calc_lcl_grid_no_dc(ds, lcl_ds, height_var, time_var, var_name):
 
     Args:
         ds (xarray dataset): dataset containing the data to be regridded
-        lcl_ds (_type_): _description_
-        height_var (_type_): _description_
-        time_var (_type_): _description_
-        var_name (_type_): _description_
+        lcl_ds (dataset): lcl dataset containing the lcl values
+        height_var (string): height variable in the dataset ds
+        time_var (string): time variable in the dataset ds
+        var_name (string): string with the name of the variable to be regridded
     """
 
     if (height_var != 'height') and (time_var != 'time'):
