@@ -21,10 +21,10 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
 from figures.mpl_style import CMAP_HF_ALL, COLOR_SHALLOW, COLOR_CONGESTUS, COLOR_N, COLOR_S, COLOR_T
-
+from figures.fig04_anomalies_subcloud_radar_incloud import calc_lcl_grid_no_dc
 
 from readers.lidars import read_and_map
-
+from readers.lcl import read_lcl
 
 
 def prepare_arthus_data_lat_mean(data, var_name):
@@ -32,23 +32,23 @@ def prepare_arthus_data_lat_mean(data, var_name):
     # classifying regions based on latitude
     
     #southern region
-    ind_southern = np.where(data.Latitude < 10.5)[0]
+    ind_southern = np.where(data.ship_latitude < 10.5)[0]
     # transition region
-    ind_transition = np.where( (data.Latitude <= 12.5) & (data.Latitude >= 10.5))[0]
+    ind_transition = np.where( (data.ship_latitude <= 12.5) & (data.ship_latitude >= 10.5))[0]
     # northern region
-    ind_northern = np.where(data.Latitude > 12.5)[0]
+    ind_northern = np.where(data.ship_latitude > 12.5)[0]
     
     # selecting the data
-    ds_s = data.isel(Time=ind_southern)
-    ds_t = data.isel(Time=ind_transition)
-    ds_n = data.isel(Time=ind_northern) 
+    ds_s = data.isel(time=ind_southern)
+    ds_t = data.isel(time=ind_transition)
+    ds_n = data.isel(time=ind_northern) 
     
     var_mean_s = np.nanmean(ds_s[var_name].values, axis=0)
     var_mean_t = np.nanmean(ds_t[var_name].values, axis=0)
     var_mean_n = np.nanmean(ds_n[var_name].values, axis=0)
     var_mean_all_domain = np.nanmean(data[var_name].values, axis=0)
     
-    return(var_mean_s, var_mean_t, var_mean_n, var_mean_all_domain, data.Height.values)
+    return(var_mean_s, var_mean_t, var_mean_n, var_mean_all_domain, data.height.values)
 
 def plot_profiles_arthus(ax, 
                          t_s, 
@@ -137,7 +137,6 @@ def plot_profiles_arthus(ax,
 
 
 
-
 font_size=25
 font_titles=25
 
@@ -145,25 +144,78 @@ font_titles=25
 T = read_and_map('T')
 MR = read_and_map('MR')
 
+# rename time and height variables
+T = T.rename({'Time': 'time', 'Height': 'height'})
+MR = MR.rename({'Time': 'time', 'Height': 'height'})
+
+# read lcl and calculate its diurnal cycle at 15 mins and at 30 mins (for fluxes)
+ds_lcl = read_lcl()
+
+# align time stamps for ds_lcl and ds_arthus
+ds_lcl_interp_T, ds_T_interp = xr.align(ds_lcl, T, join="inner")
+ds_lcl_interp_MR, ds_MR_interp = xr.align(ds_lcl, MR, join="inner")
+
+
+# regrid temperature and mixing ratio on height with respect to lcl
+T_lcl = calc_lcl_grid_no_dc(ds_T_interp, ds_lcl_interp_T, 'height', 'time', 'Product')
+MR_lcl = calc_lcl_grid_no_dc(ds_MR_interp, ds_lcl_interp_MR, 'height', 'time', 'Product')
+
+# create new xarray dataset and add variable field, ship_latitude and longitude to it
+ds_T = xr.Dataset()
+# add variable field to the dataset
+ds_T['T'] = (['time', 'height'], T_lcl.values)
+# add ship latitude and longitude to the dataset
+ds_T['ship_latitude'] = (['time'], ds_T_interp.ship_latitude.values)
+ds_T['ship_longitude'] = (['time'], ds_T_interp.ship_longitude.values)
+# add time coordinate to the dataset
+ds_T['time'] = ds_T_interp.time
+# add height coordinate to the dataset
+ds_T['height'] = T_lcl.height
+
+ds_MR = xr.Dataset()
+# add variable field to the dataset
+ds_MR['MR'] = (['time', 'height'], MR_lcl.values)
+# add ship latitude and longitude to the dataset
+ds_MR['ship_latitude'] = (['time'], ds_MR_interp.ship_latitude.values)
+ds_MR['ship_longitude'] = (['time'], ds_MR_interp.ship_longitude.values)
+# add time coordinate to the dataset
+ds_MR['time'] = ds_MR_interp.time
+# add height coordinate to the dataset
+ds_MR['height'] = MR_lcl.height 
+
+
 # prepare data for the figure (mean T over the trajectory, mean over southern, transition, and northern domain)
-t_s, t_t, t_n, t_mean, height = prepare_arthus_data_lat_mean(T,'Product')
-mr_s, mr_t, mr_n, mr_mean, height = prepare_arthus_data_lat_mean(MR,'Product')
+t_s, t_t, t_n, t_mean, height = prepare_arthus_data_lat_mean(ds_T,'T')
+mr_s, mr_t, mr_n, mr_mean, height = prepare_arthus_data_lat_mean(ds_MR,'MR')
 
 
 # plot of the profiles of T for the trajectory regions
 fig, ax = plt.subplots(figsize=(8, 12))
+
+# Color the area below the LCL height in grey
+lcl_height = 0  # Assuming LCL height is at 0 km
+ax.fill_between([190, 299], 
+                -1, 
+                lcl_height, 
+                color='grey', 
+                alpha=0.2)
+
 
 ax.set_title("c) Mean temperature", 
                 loc='left', 
             fontsize=font_titles,
             fontweight='black')
 ax.set_xlim([290, 299])
-ax.set_yticks(np.arange(0.25, 1, 0.1))
-ax.set_ylim([0.250, 1])
+ax.set_ylim([-0.8, 0.6])
+ax.set_yticks([-0.8, -0.6, -0.3, 0., 0.3, 0.6])
+ax.set_yticklabels(["-0.8","-0.6","-0.3", "LCL", "0.3", "0.6"])
+ax.set_ylabel("Height above LCL [km]",fontsize=font_size)
 ax.tick_params(axis='both', which='major', labelsize=font_size)
 ax.set_xlabel('Temperature [K]', fontsize=font_size)
-ax.set_ylabel('Height [km]', fontsize=font_size)
 plot_profiles_arthus(ax, t_s, t_t, t_n, t_mean, height)
+
+
+
 
 # save figure
 fig.savefig('/work/plots_rain_paper/fig_1_c.png',
@@ -173,19 +225,28 @@ fig.savefig('/work/plots_rain_paper/fig_1_c.png',
 
 print('figure fig_1_c.png saved')
 
-
 fig, ax = plt.subplots(figsize=(8, 12))
+
+# Color the area below the LCL height in grey
+lcl_height = 0  # Assuming LCL height is at 0 km
+ax.fill_between([12, 17], 
+                -1, 
+                lcl_height, 
+                color='grey', 
+                alpha=0.2)
+
 
 ax.set_title("d) Mean mixing ratio", 
                 loc='left', 
             fontsize=font_titles,
             fontweight='black')
 ax.set_xlim([12, 17])
-ax.set_yticks(np.arange(0.25, 1, 0.1))
-ax.set_ylim([0.250, 1])
+ax.set_ylim([-0.8, 0.6])
+ax.set_yticks([-0.8, -0.6, -0.3, 0., 0.3, 0.6])
+ax.set_yticklabels(["-0.8","-0.6","-0.3", "LCL", "0.3", "0.6"])
+ax.set_ylabel("Height above LCL [km]",fontsize=font_size)
 ax.tick_params(axis='both', which='major', labelsize=font_size)
 ax.set_xlabel('Mixing ratio  [gkg$^{-1}$]', fontsize=font_size)
-ax.set_ylabel('Height [km]', fontsize=font_size)
 plot_profiles_arthus(ax, mr_s, mr_t, mr_n, mr_mean, height)
 
 # save figure
