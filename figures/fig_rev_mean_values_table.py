@@ -4,7 +4,8 @@ calculate mean variables for shallow and congestus clouds and do T test """
 import xarray as xr
 from cloudtypes.path_folders import path_paper_plots
 from readers.cloudtypes import read_cloud_class, read_rain_flags
-
+from readers.cloudtypes import read_cloud_class, read_rain_flags
+from readers.radar import read_lwp
 import os
 from glob import glob
 
@@ -45,11 +46,38 @@ def main():
     cb_shallow = cloudclassdata.cloud_base.values[shallow_cloudy]
     cb_congestus = cloudclassdata.cloud_base.values[congestus_cloudy]
 
-    # select only positive values
+    # read LWP data
+    merian = read_lwp() 
+
+    # read rain flags
+    rainflags = read_rain_flags()
+    cloudyflag = ((rainflags.flag_rain_ground.values == 0) & (rainflags.flag_rain.values == 0)) #everything thats cloudy in ground_rain and rain
+
+  # interpolate classification on LWP time stamps and derive flags for shallow/congestus data
+    cloudclassdataip = cloudclassdata.interp(time=merian.time)
+    shallow = (cloudclassdataip.shape.values == 0) & (cloudyflag == 1)
+    mean_lwp_shallow = np.nanmean(merian.lwp[shallow & cloudyflag])
+
+    # print mean LWP for shallow clouds
+    print(f"Mean LWP shallow: {mean_lwp_shallow:.2f} g/m^2")
+    shallow_cloud_thickness = np.nanmean(ct_shallow) - np.nanmean(cb_shallow) # in m
+    print('Mean shallow cloud thickness:', shallow_cloud_thickness, 'm')
+    gamma_ad = 2e-3 # adiabatic lapse rate in gm-4
+    LWP_ad = 0.5 * gamma_ad * shallow_cloud_thickness**2 # in gm-2
+    print(f"Mean LWP adiabatic: {LWP_ad:.2f} g/m^2")
+    # print adiabaticiity
+    print(f"Adiabaticity shallow: {mean_lwp_shallow/LWP_ad:.2f}")    
     ct_shallow = ct_shallow[ct_shallow > 0]
     ct_congestus = ct_congestus[ct_congestus > 0]
     cb_shallow = cb_shallow[cb_shallow > 0]
     cb_congestus = cb_congestus[cb_congestus > 0]
+    
+    # print mean CT shallow
+    print(f"Mean cloud top height shallow: {np.nanmean(ct_shallow):.2f} m")
+    # print mean CB shallow
+    print(f"Mean cloud base height shallow: {np.nanmean(cb_shallow):.2f} m")
+    
+    
     
     # calculate percentiles of distributions
     ct_shallow_percentiles = np.nanpercentile(ct_shallow, [0, 10, 50, 90, 100])
@@ -71,21 +99,23 @@ def main():
     import matplotlib.pyplot as plt
     plt.figure(figsize=(12, 6))
     plt.subplot(2, 1, 1)
-    plt.hist(ct_congestus, bins=50, alpha=0.5, label='congestus ct', color='blue')
-    plt.hist(cb_congestus, bins=50, alpha=0.5, label='Congestus cb', color='red')
-    plt.title('Cloud Base Height Histogram')
-    plt.xlabel('Cloud Base Height (m)')
+    plt.hist(ct_congestus, bins=50, alpha=0.5, label='congestus ct', color='blue', density=True)
+    plt.hist(cb_congestus, bins=50, alpha=0.5, label='Congestus cb', color='red', density=True)
+    plt.title('Cloud properties - congestus clouds')
+    plt.xlabel('Height (m)')
     plt.ylabel('Frequency')
     plt.legend()
+    plt.xlim(0, 5000)
     plt.grid(True)
     plt.subplot(2, 1, 2)
-    plt.hist(ct_shallow, bins=50, alpha=0.5, label='Shallow ct', color='blue')
-    plt.hist(cb_shallow, bins=50, alpha=0.5, label='shallow cb', color='red')
-
-    plt.title('Cloud Top Height Histogram')
-    plt.xlabel('Cloud Top Height (m)')
+    plt.hist(ct_shallow, bins=100, alpha=0.5, label='Shallow ct', color='blue', density=True)
+    plt.hist(cb_shallow, bins=50, alpha=0.5, label='shallow cb', color='red', density=True)
+    plt.title('Cloud properties - shallow clouds')
+    plt.xlabel('Height (m)')
     plt.ylabel('Frequency')
     plt.legend()
+    plt.xlim(0, 5000)
+
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(os.path.join(path_paper_plots, 'cloud_base_top_height_histogram.png'), dpi=300)    
