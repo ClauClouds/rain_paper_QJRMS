@@ -538,6 +538,8 @@ def read_anomalies_and_rename(measurement):
         
     """
     function to read arthus anomalies files
+    input:
+        measurement (string): string of the variable to read, e.g. 'T', 'WH_wind', 'VW', 'SHF', 'LHF', 'MR'
     """
     data = xr.open_dataset('/net/ostro/4sibylle/diurnal_cycle_arthus/5_mins/anomalies/'+measurement + '_arthus_anomaly.nc')    
 
