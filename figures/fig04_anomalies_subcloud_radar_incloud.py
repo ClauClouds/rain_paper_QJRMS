@@ -63,12 +63,27 @@ def main():
     # second row of plots: derive specific humidity and virtual potential temperature from lidar data
     ds_therm = calc_thermo_prop()
     
+
     # split datasets in q and theta_v
     ds_q, ds_theta_v, ds_td, ds_theta_e = split_dataset(ds_therm)
-    
+
+        
     ds_q_sl_prec, ds_q_sl_nonprec, ds_q_cg_prec, ds_q_cg_nonprec, ds_q_clear = prepare_therm_profiles(ds_q, ds_cp, 'q')
+
+    # print number of profiles for each of the q datasets
+    print(f"Number of shallow precip profiles for q: {ds_q_sl_prec.time.size}")
+    print(f"Number of shallow non precip profiles for q: {ds_q_sl_nonprec.time.size}")
+    print(f"Number of congestus precip profiles for q: {ds_q_cg_prec.time.size}")
+    print(f"Number of congestus non precip profiles for q: {ds_q_cg_nonprec.time.size}")
+    
     ds_theta_v_sl_prec, ds_theta_v_sl_nonprec, ds_theta_v_cg_prec, ds_theta_v_cg_nonprec, ds_theta_v_clear = prepare_therm_profiles(ds_theta_v, ds_cp, 'theta_v')
     #ds_theta_e_sl_prec, ds_theta_e_sl_nonprec, ds_theta_e_cg_prec, ds_theta_e_cg_nonprec, ds_theta_e_clear = prepare_therm_profiles(ds_theta_e, ds_cp, 'theta_e')
+    
+    #print number of profiles for Theta_v datasets
+    print(f"Number of shallow precip profiles for theta_v: {ds_theta_v_sl_prec.time.size}")
+    print(f"Number of shallow non precip profiles for theta_v: {ds_theta_v_sl_nonprec.time.size}")
+    print(f"Number of congestus precip profiles for theta_v: {ds_theta_v_cg_prec.time.size}")
+    print(f"Number of congestus non precip profiles for theta_v: {ds_theta_v_cg_nonprec.time.size}")
     
     # scatter plot of q and theta_e for each class    
     #plot_scatter_q_theta_e(ds_q_sl_prec,
@@ -83,9 +98,29 @@ def main():
     # prepare data for horizontal wind speed ()
     ds_sl_hw, ds_sl_prec_hw, ds_sl_nonprec_hw, ds_cg_hw, ds_cg_prec_hw, ds_cg_nonprec_hw = prepare_anomaly_profiles(ds_cp, "H_wind_speed", lcl_dc)
     
-
+    # print number of profiles for each of the horizontal wind speed datasets
+    print(f"Number of shallow precip profiles for horizontal wind speed: {ds_sl_prec_hw.time.size}")
+    print(f"Number of shallow non precip profiles for horizontal wind speed: {ds_sl_nonprec_hw.time.size}")
+    print(f"Number of congestus precip profiles for horizontal wind speed: {ds_cg_prec_hw.time.size}")
+    print(f"Number of congestus non precip profiles for horizontal wind speed: {ds_cg_nonprec_hw.time.size}")
+    
+    
     # prepare data (calculate mean and std of the anomaly profiles for shallow/congestus in prec and non prec)
     ds_sl, ds_cg, ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec = prepare_anomaly_profiles(ds_cp, "VW", lcl_dc)
+    
+    # print number of profiles for vertical velocity datasets
+    print(f"Number of shallow precip profiles for vertical velocity: {ds_sl_prec.time.size}")
+    print(f"Number of shallow non precip profiles for vertical velocity: {ds_sl_nonprec.time.size}")
+    print(f"Number of congestus precip profiles for vertical velocity: {ds_cg_prec.time.size}")
+    print(f"Number of congestus non precip profiles for vertical velocity: {ds_cg_nonprec.time.size}")
+    
+    # plot percentiles of variables at selected heights for each variable
+    plot_profiles_percentiles(ds_q_sl_prec, ds_q_cg_prec, 'q', 'gkg$^{-1}$', 'precipitating')
+    plot_profiles_percentiles(ds_q_sl_nonprec, ds_q_cg_nonprec, 'q', 'gkg$^{-1}$', 'non precipitating')
+    plot_profiles_percentiles(ds_theta_v_sl_prec, ds_theta_v_cg_prec, '$\theta_v$', 'K', 'precipitating')
+    plot_profiles_percentiles(ds_theta_v_sl_nonprec, ds_theta_v_cg_nonprec, '$\theta_v$', 'K', 'non precipitating')
+    plot_profiles_percentiles(ds_sl_prec, ds_cg_prec, 'VW', 'ms$^{-1}$', 'precipitating')
+    plot_profiles_percentiles(ds_sl_nonprec, ds_cg_nonprec, 'VW', 'ms$^{-1}$', 'non precipitating')
     
     # calculate distributions of cloud base heights with respect to the LCL for each flag
     ds_cb_sllcl, ds_cb_cglcl = calc_cblcl(ds_cp)
@@ -120,6 +155,115 @@ def main():
                            ds_cg_nonprec_hw,
                            data)
     
+def calc_perc_median(data):
+    """
+    function to calculate percentiles of the given datarray(time, height) provided in input
+    """
+    mean = np.nanmean(data, axis=0)
+    median = np.nanmedian(data, axis=0)
+    perc_25 = np.nanpercentile(data, 25, axis=0)
+    perc_75 = np.nanpercentile(data, 75, axis=0) 
+    perc_10 = np.nanpercentile(data, 10, axis=0)
+    perc_90 = np.nanpercentile(data, 90, axis=0)   
+        
+    return(median, mean, perc_25, perc_75, perc_10, perc_90)
+
+ 
+def plot_profiles_percentiles(ds_sl, ds_cg, var_name, units, condition):
+    '''
+    function to plot percentiles of variables as a function of height for shallow and congestus clouds in a precise prec/nonprec condition
+    dependencies:
+    - ds_sl: dataset for shallow clouds
+    - ds_cg: dataset for congestus clouds
+    - var_name: name of the variable to plot
+    - units: units of the variable to plot
+    - condition: condition to apply to the datasets (e.g. 'prec', 'nonprec')
+    
+    dependencies:
+    - calc_perc_median
+    - plot_perc_cloud_type
+    '''
+    print('processing'+var_name+' '+condition)
+    
+    if var_name == 'VW':
+        variable = 'VW_anomaly'
+        var_string = 'VW'
+        x_min = -1.
+        x_max = 1.
+    elif var_name == '$\theta_v$':
+        variable = 'theta_v'
+        var_string = '$\Theta_v$'
+        x_min = 298.
+        x_max = 310.
+    elif var_name == 'q':
+        variable = 'q'
+        var_string = 'q'
+        x_min = 10.
+        x_max = 18.
+    
+    print('extrems for x azis', x_min, x_max)
+    # reading in the data from shallow and from congestus datasets
+    data_sl = ds_sl.values
+    height_sl = ds_sl.height.values
+    data_cg = ds_cg.values
+    height_cg = ds_cg.height.values
+    
+    # calculating percentiles and median for shallow and congestus dataset
+    median_sl, mean_sl, perc_25_sl, perc_75_sl, perc_10_sl, perc_90_sl = calc_perc_median(data_sl)
+    median_cg, mean_sl, perc_25_cg, perc_75_cg, perc_10_cg, perc_90_cg = calc_perc_median(data_cg)
+    
+    # create figure
+    fig, ax = plt.subplots(figsize=(6, 8))
+    # plot percentiles for shallow clouds
+    plot_perc_cloud_type(ax, median_sl, perc_25_sl, perc_75_sl, perc_10_sl, perc_90_sl, height_sl*1e-3, COLOR_SHALLOW, x_min, x_max)
+    # plot percentiles for congestus clouds
+    plot_perc_cloud_type(ax, median_cg, perc_25_cg, perc_75_cg, perc_10_cg, perc_90_cg, height_cg*1e-3, COLOR_CONGESTUS, x_min, x_max)
+    
+    # set title and labels
+    #ax.set_title(condition+' clouds', loc='left', fontweight='black', fontsize=20)
+    ax.set_xlabel(var_string+' ['+units+']', fontsize=20) 
+    ax.set_ylabel('Height [m]', fontsize=20) 
+    
+    # set ylimit and labels for yaxis
+    ax.set_ylim(-0.5, 1.5)
+    ax.set_yticks(np.arange(-0.5, 1.5, 0.25), minor=True)
+    ax.set_yticklabels([-0.5, -0.25, "LCL", 0.25, 0.5, 1, 1.25, 1.5], fontsize=15)
+    ax.set_xticklabels(ax.get_xticks(), fontsize=15)
+    # add white background to the legend
+    #ax.legend(fontsize=15, frameon=True)
+    # set legend fontsize to 15
+    
+    ax.grid(True)
+
+    # make x and y axis thicker
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_linewidth(2)
+    ax.spines['left'].set_linewidth(2)
+    ax.get_xaxis().tick_bottom()
+    ax.get_yaxis().tick_left()
+    
+    plt.tight_layout()
+    fig.savefig('/net/ostro/plots_rain_paper/fig_04_percentiles_profiles_'+variable+'_'+condition+'_reviewer.png', dpi=300)
+    
+    return()
+
+
+
+def plot_perc_cloud_type(ax, median, perc_25, perc_75, perc_10, perc_90, height, color_cloud_type, x_min, x_max):
+    ax.plot(median, height, label='Mean', color=color_cloud_type, linewidth=1)
+    ax.plot(median, height, label='Median', color=color_cloud_type, linewidth=4)
+    ax.plot(perc_25, height, color=color_cloud_type, linestyle='--', label='25th perc', linewidth=2)
+    ax.plot(perc_75, height, color=color_cloud_type, linestyle='--', label='75th perc', linewidth=2)
+    ax.plot(perc_10, height, color=color_cloud_type, linestyle=':', label='10th perc', linewidth=2)
+    ax.plot(perc_90, height, color=color_cloud_type, linestyle=':', label='90th perc', linewidth=2)
+    ax.fill_betweenx(height, perc_25, perc_75, color=color_cloud_type, alpha=0.3)
+    ax.fill_betweenx(height, perc_10, perc_90, color=color_cloud_type, alpha=0.1)
+    ax.set_xlim(x_min, x_max)
+
+    #plot dashed lines for median + and - 25th percentile
+
+    return()
 
 
 def plot_scatter_q_theta_e(ds_q_sl_prec,
@@ -479,7 +623,7 @@ def plot_multipanel_figure(lcl_dc,
                   ds_q_cg_prec, 
                   ds_q_cg_nonprec, 
                   10, 16.5, 'q [g/kg]')
-    ax3.plot(ds_q_clear.mean("time"),
+    ax3.plot(ds_q_clear.median("time"),
              ds_q_clear.height* 1e-3,
              label='clear sky',
              color='black', 
@@ -497,7 +641,7 @@ def plot_multipanel_figure(lcl_dc,
                   ds_theta_v_cg_prec, 
                   ds_theta_v_cg_nonprec, 
                   300, 310, '$\Theta_v$[K]')
-    ax4.plot(ds_theta_v_clear.mean("time"),
+    ax4.plot(ds_theta_v_clear.median("time"),
              ds_theta_v_clear.height* 1e-3,
              label='clear sky',
              color='black', 
@@ -588,7 +732,7 @@ def plot_multipanel_figure(lcl_dc,
     plt.tight_layout()
     
     # Save the figure to a file
-    fig.savefig('/net/ostro/plots_rain_paper/fig_04_multipanel_figure_new.png')
+    fig.savefig('/net/ostro/plots_rain_paper/fig_04_multipanel_figure_new_rev_median.png')
 
 def plot_distr(shallow, congestus):
     
@@ -616,25 +760,25 @@ def plot_distr(shallow, congestus):
     
 def plot_profiles(ax, ds_sl_prec, ds_sl_nonprec, ds_cg_prec, ds_cg_nonprec, vmin, vmax, var_name):
     
-    ax.plot(ds_sl_nonprec.mean("time", skipna=True),
+    ax.plot(ds_sl_nonprec.median("time", skipna=True),
                  ds_sl_nonprec.height* 1e-3,
                  label='shallow non prec',
                  color=COLOR_SHALLOW, 
                  linewidth=3)
-    ax.plot(ds_cg_nonprec.mean("time", skipna=True),
+    ax.plot(ds_cg_nonprec.median("time", skipna=True),
                  ds_cg_nonprec.height* 1e-3,
                  label='congestus non prec',
                 color=COLOR_CONGESTUS, 
                 linewidth=3)
 
-    ax.plot(ds_sl_prec.mean("time", skipna=True),
+    ax.plot(ds_sl_prec.median("time", skipna=True),
                  ds_sl_prec.height* 1e-3,
                  label='shallow prec',
                  color=COLOR_SHALLOW, 
                  linestyle=':', 
                 linewidth=3)
 
-    ax.plot(ds_cg_prec.mean("time", skipna=True),
+    ax.plot(ds_cg_prec.median("time", skipna=True),
                  ds_cg_prec.height* 1e-3,
                  label='congestus prec',
                  color=COLOR_CONGESTUS, 
