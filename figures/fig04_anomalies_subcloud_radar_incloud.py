@@ -1418,12 +1418,14 @@ def plot_multipanel_figure_V2(lcl_dc,
     
     # Create a GridSpec with 3 rows and 2 columns
     subplots = plt.subplots()
-    gs = subplots[0].add_gridspec(2, 6, height_ratios=[3, 4]) #, width_ratios=[2, 2, 2, 2, 2, 2]
+    #gs = subplots[0].add_gridspec(2, 6, height_ratios=[3, 4]) #, width_ratios=[2, 2, 2, 2, 2, 2]
+    gs = subplots[0].add_gridspec(2, 4, height_ratios=[3, 4]) #, width_ratios=[2, 2, 2, 2, 2, 2]
+
     #gs.subplots_adjust(hspace=0.3)
     # Add subplots with different sizes
     
     # cloud base height distributions
-    ax1 = fig.add_subplot(gs[0, 0:2])  # Second row, first column, profiles of w
+    ax1 = fig.add_subplot(gs[0, 0])  
     ax1.plot(hist_shallow, bins_shallow_centered, color=COLOR_SHALLOW, linewidth=2)
     ax1.plot(hist_congestus, bins_congestus_centered, color=COLOR_CONGESTUS, linewidth=2)
     ax1.fill_betweenx(bins_shallow_centered, 0., hist_shallow, color=COLOR_SHALLOW, alpha=0.5)
@@ -1436,7 +1438,7 @@ def plot_multipanel_figure_V2(lcl_dc,
     ax1.set_title(" a) CB distribution", loc='left', fontweight='black')
     
     # profiles of w
-    ax2 = fig.add_subplot(gs[0, 2])  # Second row, first column, profiles of w
+    ax2 = fig.add_subplot(gs[0, 1])  # Second row, first column, profiles of w
     plot_profiles(ax2, 
                   ds_sl_prec, 
                   ds_sl_nonprec, 
@@ -1445,17 +1447,8 @@ def plot_multipanel_figure_V2(lcl_dc,
                   -0.4, 0.4, 'w anomaly [m/s]')
     ax2.set_title('b) W anomaly', loc='left', fontweight='black')
 
-    ax2bis = fig.add_subplot(gs[0, 3])  # Second row, first column, profiles of w
-    plot_profiles(ax2bis, 
-                  ds_sl_prec_hw, 
-                  ds_sl_nonprec_hw, 
-                  ds_cg_prec_hw,
-                  ds_cg_nonprec_hw,
-                  -1, 1, 'H wind anomaly [m/s]')
-    ax2bis.set_title('c) Hspeed \n anomaly', loc='left', fontweight='black')
-
     # profiles of q
-    ax3 = fig.add_subplot(gs[0, 4], sharey=ax2)  # Second row, second column profiles of q
+    ax3 = fig.add_subplot(gs[0, 2], sharey=ax2)  # Second row, second column profiles of q
     plot_profiles(ax3, 
                   ds_q_sl_prec, 
                   ds_q_sl_nonprec, 
@@ -1473,7 +1466,7 @@ def plot_multipanel_figure_V2(lcl_dc,
 
  
     # profiles of theta_v
-    ax4 = fig.add_subplot(gs[0, 5], sharey=ax2)  # Second row, third column profiles of thetav
+    ax4 = fig.add_subplot(gs[0, 3], sharey=ax2)  # Second row, third column profiles of thetav
     plot_profiles(ax4, 
                   ds_theta_v_sl_prec, 
                   ds_theta_v_sl_nonprec, 
@@ -1490,10 +1483,10 @@ def plot_multipanel_figure_V2(lcl_dc,
 
     # Generate the legend from ax4
     handles, labels = ax4.get_legend_handles_labels()
-    ax2.legend(handles, labels, loc='center', frameon=False, ncol=5, bbox_to_anchor=(0.5, 1.15))
+    ax2.legend(handles, labels, loc='center', frameon=False, ncol=4, bbox_to_anchor=(0.5, 1.15))
 
     # scatter Ze vs Vd
-    ax5 = fig.add_subplot(gs[1, 0:3])  # Third row, left plot
+    ax5 = fig.add_subplot(gs[1, 0:2])  # Third row, left plot
     ax5.set_title('f) Normalized Occurrences of Ze vs Vd', loc='left', fontweight='black')
 
     hist_d = ax5.hist2d(ze_c, 
@@ -1522,7 +1515,7 @@ def plot_multipanel_figure_V2(lcl_dc,
     
     # scatter Ze vs Sk
 
-    ax6 = fig.add_subplot(gs[1, 3:])  # Third row, right plot
+    ax6 = fig.add_subplot(gs[1, 2:])  # Third row, right plot
     ax6.set_title('g) Normalized Occurrences of Ze vs Sk', loc='left', fontweight='black')
 
     hist_d = ax6.hist2d(ze_c, 
@@ -1548,7 +1541,7 @@ def plot_multipanel_figure_V2(lcl_dc,
     ax6.set_ylim(-1., 1.)
     ax6.set_xlim(-50.,25.)
     
-    for ax in [ax1, ax2, ax2bis, ax3, ax4, ax5, ax6]:  # Loop over all axes    
+    for ax in [ax1, ax2, ax3, ax4, ax5, ax6]:  # Loop over all axes    
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.spines["bottom"].set_linewidth(2)
@@ -1566,7 +1559,7 @@ def plot_multipanel_figure_V2(lcl_dc,
 
     
     # Save the figure to a file
-    fig.savefig('/net/ostro/plots_rain_paper/fig_04_multipanel_figure_new_V2.png')
+    fig.savefig('/net/ostro/plots_rain_paper/fig_04_multipanel_figure_new_V2_rev_median.png')
 
 
 
