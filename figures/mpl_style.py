@@ -17,6 +17,8 @@ CMAP_discr = cmc.batlowW
 cmap_rs_shallow = cmc.roma
 cmap_rs_congestus = cmc.managua
 cmap_gif = cmc.vik
+cmap_era5 = cmc.vikO
+cmap_wind_era5 = cmc.imola
 cmap_gif2 = cmc.vanimo
 
 mpl.rcParams["legend.frameon"] = False
