@@ -23,6 +23,7 @@ from scipy import interpolate
 from glob import glob
 import metpy.calc as mpcalc 
 from metpy.calc import equivalent_potential_temperature
+from metpy.calc import virtual_potential_temperature
 from metpy.units import units
 from metpy.calc import specific_humidity_from_dewpoint
 from matplotlib.lines import Line2D
@@ -49,10 +50,11 @@ def main():
     # selecting data from the two soundings
     ds_s1 = ds.sel(sounding=sound1)
     ds_s2 = ds.sel(sounding=sound2)
-    theta_e_1, q_1 = calc_paluch_quantities(ds_s1, '202002121415')
-    theta_e_2, q_2 = calc_paluch_quantities(ds_s2, '202002121855')
+    
+    theta_e_1, q_1, theta_v_1, z_1 = calc_paluch_quantities(ds_s1, '202002121415')
+    theta_e_2, q_2, theta_v_2, z_2 = calc_paluch_quantities(ds_s2, '202002121855')
  
- 
+    
     # read time stamps for the soundings
     time_s1 = ds_s1.launch_time.values #datetime(2020,2,12, 14, 15) # 14:15 LT
     time_s2 = ds_s2.launch_time.values #datetime(2020,2,12, 18, 55) # 18:55 LT
@@ -143,53 +145,41 @@ def main():
     print(f'theta_e at LCL for sounding 2: {theta_e_lcl_s2:.2f} K')
     
 
-    # reading heights of the soundings
-    z_1 = ds_s1['alt'].values
-    z_2 = ds_s2['alt'].values
-
-
     # define colorbars for sounding 1 and sounding 2
     cmap_s1 = CMAP
     norm_s1 = mpl.colors.Normalize(vmin=0, vmax=4000.)
     cmap_s1.set_under('white')
     
-
-    # plot figure of Temperature and Relative Humidity profiles as a function of height
-    # create 2 subplots
-    fig, axs = plt.subplots(1,2, figsize=(15, 18), sharey=True)
-    ax = axs[0]
-    ax.plot(ds_s1['ta'],
-            z_1, 
-            label='Temperature', 
-            color='orange',
-            linewidth=4) # Temperature
-    ax2=axs[1]
-    ax2.plot(ds_s1['rh']*100, 
-            z_1, 
-            label='Relative humidity',
-            color='green',
-            linewidth=4) # Dewpoint
+    # plot profiles of theta_v and theta_e in 2 different subplots
+    fig, axs = plt.subplots(1, 2, figsize=(20, 15), sharey=True)
+    # set font sizes of all the plot
+    fontsize = 30
+    rcParams.update({'font.size': fontsize})
+    marker_size = 300
+    marker_other = 500
     
-    ax.set_xlabel('Temperature (C)', fontsize=20)
-    ax2.set_xlabel('Relative humidity (%)', fontsize=20)
-    ax.set_ylabel('Height (m)', fontsize=20)
-    ax.set_xlim(280, 300)
-    ax2.set_xlim(70, 100)
-    for ax in axs[:]:
-        ax.spines["right"].set_visible(False)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.spines["bottom"].set_linewidth(3)
-        ax.spines["left"].set_linewidth(3)
-        ax.tick_params(which='minor', length=5, width=2, labelsize=25)
-        ax.tick_params(which='major', length=7, width=3, labelsize=25)
-        ax.set_ylim(0, 1000)
+    axs[0].plot(theta_e_1, z_1, color='black', label='14:15 LT', linewidth=3)
+    axs[0].plot(theta_e_2, z_2, color='red', label='18:55 LT', linestyle='--', linewidth=3)
+    
+    axs[0].set_xlabel('$\Theta_e$ [K]', fontsize=fontsize)
+    axs[0].set_ylabel('Height [m]', fontsize=fontsize)
+    
+    axs[1].plot(theta_v_1, z_1, color='black', label='14:15 LT', linewidth=3)
+    axs[1].plot(theta_v_2, z_2, color='red', label='18:55 LT', linestyle='--', linewidth=3)
+    axs[1].set_xlabel('$\Theta_v$ [K]', fontsize=fontsize)
+    axs[0].set_ylim(0, 5000)
+    axs[1].set_ylim(0, 5000)
+    axs[0].set_xlim(310, 350)
+    axs[1].set_xlim(300, 320)
+    
+    # set fontsize of the x and y ticks
+    axs[0].tick_params(axis='both', labelsize=fontsize)
+    axs[1].tick_params(axis='both', labelsize=fontsize)
 
-    # set all fonts to 20    
     fig.tight_layout()
-    # save figure
-    fig.savefig('/net/ostro/plots_rain_paper/figKIT_sounding_'+date+'.png')
-    
+    axs[0].legend(fontsize=fontsize)
+    axs[1].legend(fontsize=fontsize)
+    fig.savefig(f'/net/ostro/plots_rain_paper/fig_paquita_theta_e_theta_v_{date}.png')
     
     
     # plot figure Paluch plot
@@ -400,33 +390,33 @@ def main():
     # plot specific humidity for the two time stamps
     axs[0].plot(q_1, 
                 z_1,                
-                color='blue', 
+                color='black', 
                 label='14:15 LT',
                 linewidth=4)
     axs[0].plot(q_2,
                 z_2,
-                color='orange',
+                color='red',
                 label='18:55 LT',
                 linewidth=4)
     # plot horizontal line for LCL 
     axs[0].axhline(lcl_s1.lcl.values,
-                   color='blue',
+                   color='black',
                    linestyle='--',
                    linewidth=2,
                    label='LCL 14:15 LT')
     axs[0].axhline(lcl_s2.lcl.values,
-                   color='orange',
+                   color='red',
                    linestyle='--',
                    linewidth=2,
                    label='LCL 18:55 LT')
     # plot cloud top for the two time stamps
     axs[0].axhline(ct_s1,
-                     color='blue',
+                     color='black',
                      linestyle=':',
                      linewidth=2,
                      label='Cloud top 14:15 LT')
     axs[0].axhline(ct_s2,
-                        color='orange',
+                        color='red',
                         linestyle=':',
                          linewidth=2,
                         label='Cloud top 18:55 LT')
@@ -445,8 +435,6 @@ def main():
         ax.get_yaxis().tick_left()
     
     
-    axs[0].set_ylabel('Difference in specific humidity [gkg$^{-1}$]', fontsize=fontsize)
-
     # plot theta_e and q for the two time stamps
     # select only the heights where the difference is not nan
     ind_good_1 = ~np.isnan(theta_e_1)
@@ -459,34 +447,34 @@ def main():
 
     axs[1].plot(theta_e_1.magnitude, 
                 z_1,                
-                color='blue', 
+                color='black', 
                 label='14:15 LT',
                 linewidth=4)
     
     axs[1].plot(theta_e_2.magnitude,
                 z_2,                
-                color='orange', 
+                color='red', 
                 label='18:55 LT',
                 linewidth=4)
        # plot horizontal line for LCL 
     axs[1].axhline(lcl_s1.lcl.values,
-                   color='blue',
+                   color='black',
                    linestyle='--',
                     linewidth=2,
                    label='LCL 14:15 LT')
     axs[1].axhline(lcl_s2.lcl.values,
-                   color='orange',
+                   color='red',
                    linestyle='--',
                    linewidth=2,
                    label='LCL 18:55 LT')
     # plot cloud top for the two time stamps
     axs[1].axhline(ct_s1,
-                     color='blue',
+                     color='black',
                      linestyle=':',
                      linewidth=2,
                      label='Cloud top 14:15 LT')
     axs[1].axhline(ct_s2,
-                        color='orange',
+                        color='red',
                         linestyle=':',
                         linewidth=2,
                         label='Cloud top 18:55 LT')
@@ -519,6 +507,7 @@ def calc_paluch_quantities(ds, date=202002121415):
     p = ds['p'].values # in Pa
     T = ds['ta'].values # in K
     Td = ds['dp'].values # in K
+    z = ds['alt'].values # in m
     
     # convert in the right units
     # convert p from Pa to hpa
@@ -534,6 +523,16 @@ def calc_paluch_quantities(ds, date=202002121415):
     # calculate specific humidity
     q = specific_humidity_from_dewpoint(p * units.hPa, Td * units.degC).to('g/kg')
     
+    # calculate virtual potential temperature
+    # select values where q is not nan
+    i_good = ~np.isnan(q)
+    p = p[i_good]
+    T = T[i_good]
+    q = q[i_good]
+    z = z[i_good]
+    theta_e = theta_e[i_good]
+    
+    theta_v = virtual_potential_temperature(p * units.hPa, T * units.degC, q)  
     
     # plot the input of the function
     ##fig, ax = plt.subplots()
@@ -547,7 +546,7 @@ def calc_paluch_quantities(ds, date=202002121415):
     #fig.savefig('/net/ostro/plots_rain_paper/profiles_rs_'+date+'.png')
     
     
-    return theta_e, q
+    return theta_e, q, theta_v, z
     
 
 
