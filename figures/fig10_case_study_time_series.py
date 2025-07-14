@@ -52,15 +52,16 @@ def main():
 
 
     # read input data
-    ship_data = read_ship()
-    LWP_IWV_data = read_lwp()
+    ship_data = read_ship()   # read ship data
+    LWP_IWV_data = read_lwp() # read LWP and IWV data
     radarData = read_radar_single_file(yy,mm,dd)
     MRR_data = read_mrr_given_day(yy,mm,dd)
-    H_wind_speed_data = read_Hwind_speeds()
+    #H_wind_speed_data = read_Hwind_speeds()
     
     # read mixing ratio anomalies
     MR_anomaly = read_anomalies('MR')
-
+    T_anomaly = read_anomalies('T')
+    
     sat_data = read_satellite_classification()
 
     
@@ -70,8 +71,9 @@ def main():
     #flags_transition = flag_data.sel(time=slice(time_start, time_end))   
     ship_transition = ship_data.sel(time=slice(time_start, time_end))   
     MRR_transition = MRR_data.sel(time=slice(time_start, time_end))   
-    H_s_transition = H_wind_speed_data.sel(time=slice(time_start, time_end))   
+    #H_s_transition = H_wind_speed_data.sel(time=slice(time_start, time_end))   
     MR_transition = MR_anomaly.sel(Time=slice(time_start, time_end))  
+    T_transition = T_anomaly.sel(Time=slice(time_start, time_end))
     sat_transition = sat_data.sel(time=slice(time_start, time_end))  
     
     # find transition times
@@ -81,8 +83,8 @@ def main():
     
     
     # visualize transition in a plot: surface obs and satellite measurements
-    plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transition, MRR_transition, MR_transition, time_start_transition, time_end_transition)
-    visualize_satellite_composite(sat_data)
+    plot_figure9(ship_transition, radar_transition, LWP_transition, MRR_transition, MR_transition, T_transition, time_start_transition, time_end_transition)
+    #visualize_satellite_composite(sat_data)
     
 
     
@@ -90,9 +92,20 @@ def main():
 
     
     
-def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transition, MRR_transition, MR_transition, time_start_transition, time_end_transition):
+def plot_figure9(ship_transition, radar_transition, LWP_transition, MRR_transition, MR_transition, T_transition, time_start_transition, time_end_transition):
     
-    
+    """
+    plot time series of variables during the transition period of the 12 february 2020
+    Args:
+        ship_transition (xarray dataset): ship data for the transition period
+        radar_transition (xarray dataset): radar data for the transition period
+        LWP_transition (xarray dataset): LWP data for the transition period
+        MRR_transition (xarray dataset): MRR data for the transition period
+        MR_transition (xarray dataset): mixing ratio anomaly data for the transition period
+        T_transition (xarray dataset): temperature anomaly data for the transition period
+        time_start_transition (datetime): start time of the transition
+        time_end_transition (datetime): end time of the transition
+    """
     # set all fonts to 20
     rcParams.update({'font.size': 30})
     rcParams.update({'axes.labelsize': 30})
@@ -114,6 +127,10 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     time_interval_5 = (time_transition - time_start).astype('timedelta64[s]').astype(int)
     time_interval_2 = (time_end_transition - time_transition).astype('timedelta64[s]').astype(int)
 
+    # add radiosonde times
+    radiosonde_time_1 = np.datetime64('2020-02-12T14:15:00')
+    radiosonde_time_2 = np.datetime64('2020-02-12T18:55:00')
+    
     
     # selecting height for mrr
     # select one height 
@@ -122,7 +139,7 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     
     fig = plt.figure(figsize=(25,28), layout="constrained")
     # set that x axis is shared
-    gs = GridSpec(6, 1, height_ratios=[1, 1, 1, 1, 1, 1], figure=fig)
+    gs = GridSpec(7, 1, height_ratios=[1, 1, 1, 1, 1, 1, 1], figure=fig)
 
     # first suplot: LWP and rain rates
     ax0 = fig.add_subplot(gs[0, 0])
@@ -134,33 +151,55 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     ax0.set_ylim(0., 1000.)
     ax0.vlines(time_5, 0, 1000., color=color_5, linewidth=8, linestyle=':')
     ax0.vlines(time_2, 0, 1000., color=color_2, linewidth=8, linestyle=':')
+    ax0.vlines(radiosonde_time_1, 0, 1000., color='black', linewidth=8, linestyle=':')
+    ax0.vlines(radiosonde_time_2, 0, 1000., color='red', linewidth=8, linestyle=':')
+    
     ax0.grid(False)
 
+
+    # second subplot: radar reflectivity wband
+    ax11 = fig.add_subplot(gs[1, 0], sharex=ax0)
+    mesh11 = ax11.pcolormesh(radar_transition.time.values, 
+                             radar_transition.height.values,
+                             radar_transition.radar_reflectivity.values.T,
+                             linewidth=7, 
+                             cmap=CMAP, 
+                             vmin=-25, vmax=30)
+    cbar = fig.colorbar(mesh11, ax=ax11, orientation='vertical', aspect=10, pad=0.005)
+    cbar.set_label('Ze [dBZ]', fontsize=25)
+    cbar.ax.tick_params(labelsize=25)
+    ax11.set_ylim(0., 2500.)
+    ax11.set_ylabel('Height [m]', fontsize=25)
+    ax11.vlines(time_5, 0, 2500., color=color_5, linewidth=8, linestyle=':')
+    ax11.vlines(time_2, 0, 2500., color=color_2, linewidth=8, linestyle=':')    
+    ax11.vlines(radiosonde_time_1, 0, 2500., color='black', linewidth=8, linestyle=':')
+    ax11.vlines(radiosonde_time_2, 0, 2500., color='red', linewidth=8, linestyle=':')    
     # add second y-axis for plotting rain rate
-    ax00 = ax0.twinx()
-    ax00.plot(MRR_time_serie.time.values, 
-                     MRR_time_serie.rain_rate.values, 
-                     linewidth=5, 
-                     color='blue',
-                     label='RR at 500 m')
+    #ax00 = ax11.twinx()
+    #ax00.plot(MRR_time_serie.time.values, 
+    #                 MRR_time_serie.rain_rate.values, 
+    #                 linewidth=5, 
+    #                 color='blue',
+    #                 label='RR at 500 m')
     
     # set tick labels font size on ax00
-    ax00.tick_params(axis='y', labelsize=20)
-    ax00.grid(False)
-    ax00.vlines(time_5, 0, 10., color=color_5, linewidth=8, linestyle=':')
-    ax00.vlines(time_2, 0, 10., color=color_2, linewidth=8, linestyle=':')
-    ax00.set_xlabel('Time [hh:mm]', fontsize=25)
+    #ax00.tick_params(axis='y', labelsize=20)
+    ##ax00.grid(False)
+    #ax00.vlines(time_5, 0, 10., color=color_5, linewidth=8, linestyle=':')
+    #ax00.vlines(time_2, 0, 10., color=color_2, linewidth=8, linestyle=':')
+    #ax00.set_xlabel('Time [hh:mm]', fontsize=25)
     
     # add legend getting labels from ax0 and ax00
-    lines, labels = ax0.get_legend_handles_labels()
-    lines2, labels2 = ax00.get_legend_handles_labels()
-    ax00.legend(lines + lines2, labels + labels2, loc='upper right', frameon=False)
-    ax0.set_ylabel('LWP [g m$^{-2}$]', fontsize=25) 
-    ax00.set_ylabel('Rain rate at 500 m [mmh$^{-1}$]', fontsize=25)
+    #lines, labels = ax0.get_legend_handles_labels()
+    #lines2, labels2 = ax00.get_legend_handles_labels()
+    #ax00.legend(lines + lines2, labels + labels2, loc='upper right', frameon=False)
+    #ax0.set_ylabel('LWP [g m$^{-2}$]', fontsize=25) 
+    #ax00.set_ylabel('Rain rate at 500 m [mmh$^{-1}$]', fontsize=25)
+    
     
     
     # second subplot: mixing ratio anomaly
-    ax1 = fig.add_subplot(gs[1, 0], sharex=ax0)
+    ax1 = fig.add_subplot(gs[2, 0], sharex=ax0)
     mesh00 = ax1.pcolormesh(MR_transition.Time.values, 
                         MR_transition.Height.values, 
                         MR_transition.anomaly.values.T,
@@ -176,26 +215,30 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     ax1.vlines(time_5, 50, 600., color=color_5, linewidth=8, linestyle=':')
     ax1.vlines(time_2, 50, 600., color=color_2, linewidth=8, linestyle=':')
     
-    # third subplot: horizontal wind speed
-    ax2 = fig.add_subplot(gs[2, 0], sharex=ax0)
+    # third subplot: temperature anomaly
+    ax2 = fig.add_subplot(gs[3, 0], sharex=ax0)
 
-    mesh22 = ax2.pcolormesh(H_s_transition.time.values, 
-                              H_s_transition.height.values,
-                             H_s_transition.H_wind_speed.values.T, 
-                            cmap=CMAP, 
-                            vmin=7, vmax=15.)
+    mesh22 = ax2.pcolormesh(T_transition.Time.values, 
+                              T_transition.Height.values,
+                             T_transition.anomaly.values.T, 
+                            cmap=CMAP_an, 
+                            vmin=-3, vmax=3.)
 
     cbar = fig.colorbar(mesh22, ax=ax2, orientation='vertical', aspect=10, pad=0.005)
-    cbar.set_label('Horizontal \n wind speed [m s$^{-1}$]', fontsize=25)
+    cbar.set_label('Air temperature anomaly [K]', fontsize=25)
     cbar.ax.tick_params(labelsize=25)    
     ax2.set_ylim(250., 700.)  
     ax2.set_ylabel('Height [m]', fontsize=25)  
     ax2.vlines(time_5, 50, 600., color=color_5, linewidth=8, linestyle=':')
     ax2.vlines(time_2, 50, 600., color=color_2, linewidth=8, linestyle=':')
+    # add radiosonde times
+    ax2.vlines(radiosonde_time_1, 50, 600., color='black', linewidth=8, linestyle=':')
+    ax2.vlines(radiosonde_time_2, 50, 600., color='red', linewidth=8, linestyle=':')
+    
     
     
     # fourth subplot: surface relative humidity 
-    ax3 = fig.add_subplot(gs[3, 0], sharex=ax0)
+    ax3 = fig.add_subplot(gs[4, 0], sharex=ax0)
 
     mesh2 = ax3.plot(ship_transition.time.values, 
                         ship_transition.RH.values*100, 
@@ -215,7 +258,7 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     ax3.vlines(time_2, 50, 90., color=color_2, linewidth=8, linestyle=':')
 
     # fifth subplot: surface air temperature
-    ax4 = fig.add_subplot(gs[4, 0], sharex=ax0)
+    ax4 = fig.add_subplot(gs[5, 0], sharex=ax0)
 
     mesh2 = ax4.plot(ship_transition.time.values, 
                         ship_transition.T.values, 
@@ -232,6 +275,10 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     ax4.legend(frameon=False, loc='lower right', fontsize=25)
     ax4.vlines(time_5, 297, 302., color=color_5, linewidth=8, linestyle=':')
     ax4.vlines(time_2,297, 302., color=color_2, linewidth=8, linestyle=':')
+    # add radiosonde times
+    ax4.vlines(radiosonde_time_1, 297, 302., color='black', linewidth=8, linestyle=':')
+    ax4.vlines(radiosonde_time_2, 297, 302., color='red', linewidth=8, linestyle=':')   
+    
     ax4.set_ylim(297., 302.)  
 
     
@@ -239,7 +286,7 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     # add subplot for satellite images classification
 
     # create an array of the same lenfht as time array 
-    ax5 = fig.add_subplot(gs[5, 0], sharex=ax0)
+    ax5 = fig.add_subplot(gs[6, 0], sharex=ax0)
 
     ax5.barh(5, 
         time_interval_5, 
@@ -265,9 +312,15 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     ax5.set_yticks([1, 2, 3, 4, 5, 6, 7])
     ax5.set_yticklabels(['cl 1', 'cl 2', 'cl 3', 'cl 4', 'cl 5', 'cl 6', 'cl 7'], fontsize=20)
     ax5.set_xlabel('Time [hh:mm]', fontsize=25)  
+    
+    # add radiosonde times
+    ax5.vlines(radiosonde_time_1, 0, 7, color='black', linewidth=8, linestyle=':')
+    ax5.vlines(radiosonde_time_2, 0, 7, color='red', linewidth=8, linestyle=':')
+    # add lines of class 2 and class 5
+    ax5.vlines(time_5, 0, 7, color=color_5, linewidth=8, linestyle=':')
+    ax5.vlines(time_2, 0, 7, color=color_2, linewidth=8, linestyle=':')
 
-
-    for ax, l in zip([ax0,ax1,ax2,ax3,ax4,ax5], ['a) LWP [g m$^{-2}$] and Rain rate at 500 m [mmh$^{-1}$]', 'b) Mixing ratio anomaly ',  'c) Horizontal wind speed [m s$^{-1}$]', 'd) Surface relative humidity [%]','e) Surface air temperature [K]', 'f) Satellite class.']):
+    for ax, l in zip([ax0,ax11, ax1,ax2,ax3,ax4,ax5], ['a) LWP [g m$^{-2}$]', 'b) FMCW radar reflectivity','c) Mixing ratio (MR) anomaly ', 'd) Temperature (T) anomaly', 'e) Surface relative humidity [%]','f) Surface air temperature [K]', 'g) Satellite class.']):
                                                    
         ax.text(-0.05, 1.07, l,  fontweight='black', fontsize=25, transform=ax.transAxes)
         ax.spines["top"].set_visible(False)
@@ -288,7 +341,7 @@ def plot_figure9(ship_transition, radar_transition, H_s_transition, LWP_transiti
     #fig.subplots_adjust(hspace=1., wspace=1.)
     #fig.tight_layout()
 
-    fig.savefig('/work/plots_rain_paper/figure09_time_series.png', transparent=True)
+    fig.savefig('/work/plots_rain_paper/figure10_time_series.png', transparent=True)
 
 
 
