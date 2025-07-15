@@ -36,7 +36,7 @@ def plot_png_w_wind_dir(ds_selected,
                         date_string):
     
     """
-    function to plot specific humidity and horizontal wind direction at the selected pressure level"""
+    function to plot vertical wind sped and horizontal wind direction at the selected pressure level"""
     
     
     # set max and min range for horizontal wind speed
