@@ -230,3 +230,19 @@ def apply_filters(xrin,site='merian'):
     
     return data
 
+
+
+
+def read_W_band(date_str):
+    """
+    Read radar data corresponding to the selected day provided with date_str in the format 'YYYYMMDD'.
+    The script drops also the variables defined in DROP_VARIABLES as global variable.
+
+    Returns
+    -------
+    ds: xarray dataset with radar data
+    """
+    radarFile = '/data/obs/campaigns/eurec4a/msm/wband_radar/ncdf/published_data_v2/'+date_str+'_wband_radar_msm_eurec4a_intake.nc'
+    radarData =  xr.open_dataset(radarFile, drop_variables=DROP_VARIABLES)
+    
+    return radarData
